@@ -1,0 +1,31 @@
+:root {
+  --fondo: #eef1f4; --tarjeta: #fff; --texto: #14213d; --suave: #5b6679;
+  --linea: #d5dbe3; --acento: #0f766e; --error: #b42318;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --fondo: #0e1522; --tarjeta: #17202f; --texto: #e8edf5; --suave: #9aa6b8; --linea: #2b384c; --acento: #4fd1c5; --error: #ff8a80; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--fondo); color: var(--texto); font: 16px/1.5 system-ui, sans-serif; }
+.tarjeta { background: var(--tarjeta); border: 1px solid var(--linea); border-radius: 10px; margin: 24px auto; padding: 24px; max-width: 720px; }
+.tarjeta.angosta { max-width: 400px; margin-top: 12vh; }
+.tarjeta.ancha { max-width: 860px; }
+.centro { text-align: center; margin-top: 20vh; }
+h1 { margin: 0 0 4px; font-size: 26px; } h2 { margin: 28px 0 8px; font-size: 18px; }
+.suave { color: var(--suave); }
+.barra { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.barra h1 { margin: 0; flex: 1; }
+label { display: block; font-size: 14px; margin-bottom: 12px; }
+input, select { display: block; width: 100%; margin-top: 4px; padding: 9px 10px; font: inherit; color: inherit; background: transparent; border: 1px solid var(--linea); border-radius: 6px; }
+button { padding: 9px 16px; font: inherit; font-weight: 600; color: #fff; background: var(--acento); border: 0; border-radius: 6px; cursor: pointer; }
+button.secundario { background: transparent; color: var(--texto); border: 1px solid var(--linea); }
+button:disabled { opacity: .6; cursor: default; }
+:focus-visible { outline: 3px solid var(--acento); outline-offset: 2px; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--linea); }
+.fila { display: grid; gap: 12px; grid-template-columns: 1fr 2fr auto; align-items: end; }
+.fila button { margin-bottom: 12px; }
+.error { color: var(--error); font-weight: 600; }
+code { background: var(--fondo); padding: 1px 5px; border-radius: 4px; }
+@media (max-width: 600px) { .fila { grid-template-columns: 1fr; } .tarjeta { margin: 0; border-radius: 0; } }
