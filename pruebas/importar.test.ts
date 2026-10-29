@@ -132,4 +132,29 @@ prueba('en recibidos el emisor distingue comprobantes con el mismo numero', () =
   assert.equal(e.duplicadasEnArchivo.length, 1)
 })
 
+prueba('recibidos reales: factura C sin desglose y neto solo en la columna IVA 0%', () => {
+  const enc = ['Fecha de Emisión', 'Tipo de Comprobante', 'Punto de Venta', 'Número Desde', 'Número Hasta', 'Cód. Autorización',
+    'Tipo Doc. Emisor', 'Nro. Doc. Emisor', 'Denominación Emisor', 'Tipo Cambio', 'Moneda',
+    'Imp. Neto Gravado IVA 0%', 'IVA 2,5%', 'Imp. Neto Gravado IVA 2,5%', 'IVA 5%', 'Imp. Neto Gravado IVA 5%', 'IVA 10,5%',
+    'Imp. Neto Gravado IVA 10,5%', 'IVA 21%', 'Imp. Neto Gravado IVA 21%', 'IVA 27%', 'Imp. Neto Gravado IVA 27%',
+    'Imp. Neto Gravado Total', 'Imp. Neto No Gravado', 'Imp. Op. Exentas', 'Otros Tributos', 'Total IVA', 'Imp. Total']
+  const m = detectarColumnas(enc, 'comprobantes_recibidos')
+  assert.equal(m.doc, 7)
+  assert.equal(m.contraparte, 8)
+  assert.equal(m.neto_gravado, 22)
+  assert.equal(m.iva, 26)
+  assert.equal(m.total, 27)
+  const alic = enc.map((h, i) => (normalizar(h).startsWith('impnetogravadoiva') ? i : -1)).filter((i) => i >= 0)
+  const vacia = (): string[] => enc.map(() => '')
+  const c = vacia(); Object.assign(c, { 0: '1/9/2026', 1: '11', 2: '2', 3: '365', 7: '20202350640', 8: 'DEPETRIS', 22: '0', 23: '0', 24: '0', 25: '0', 26: '0', 27: '142000' })
+  const d = vacia(); Object.assign(d, { 0: '3/9/2026', 1: '2', 2: '71', 3: '388033', 7: '30547000001', 11: '16500', 22: '', 23: '0', 24: '0', 25: '0', 26: '0', 27: '16500' })
+  const a = vacia(); Object.assign(a, { 0: '2/9/2026', 1: '1', 2: '5541', 3: '6019', 7: '30507000001', 18: '4364,88', 19: '20785,12', 22: '20785,12', 23: '0', 24: '0', 25: '935,33', 26: '4364,88', 27: '26085,33' })
+  const r = validarFilas('comprobantes_recibidos', [c, d, a], m, 2, '2026-10-29', alic)
+  assert.equal(r.rechazos.length, 0)
+  assert.equal(r.validas[0].neto_no_gravado, 142000) // factura C: todo el total es costo sin IVA
+  assert.equal(r.validas[1].neto_gravado, 16500) // neto tomado de la columna IVA 0%
+  assert.equal(r.validas[2].neto_no_gravado, 0) // factura A normal: no se toca
+  assert.equal(r.validas[2].iva, 4364.88)
+})
+
 console.log(`\n${n} grupos de pruebas OK`)

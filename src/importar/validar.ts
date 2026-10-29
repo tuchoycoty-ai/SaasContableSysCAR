@@ -11,6 +11,9 @@ export type Resultado = {
 
 export const MAX_FILAS = 5000
 
+// Facturas, notas de debito/credito y recibos "C" (y FCE C): no discriminan IVA, todo el importe es costo sin credito fiscal.
+const TIPOS_SIN_IVA = new Set([11, 12, 13, 15, 211, 212, 213])
+
 const IMPORTES = ['neto_gravado', 'neto_no_gravado', 'exento', 'otros_tributos', 'iva', 'total'] as const
 
 export function claveFila(tipo: TipoImportacion, f: FilaLista): string {
@@ -28,6 +31,7 @@ export function validarFilas(
   mapa: Record<string, number>,
   primeraFila: number,
   hoy: string,
+  alicuotas: number[] = [], // columnas "Imp. Neto Gravado IVA x%": se usan si "Neto Gravado Total" viene vacio
 ): Resultado {
   const campos = camposDe(tipo)
   const validas: FilaLista[] = []
@@ -80,7 +84,11 @@ export function validarFilas(
       const cambio = parseNumero(celda(r, 'tipo_cambio'))
       o.tipo_cambio = cambio
       for (const id of IMPORTES) {
-        const bruto = celda(r, id)
+        let bruto = celda(r, id)
+        if (id === 'neto_gravado' && textoCelda(bruto) === '' && alicuotas.length > 0) {
+          const partes = alicuotas.map((i) => parseNumero(r[i])).filter((x): x is number => x !== null)
+          if (partes.length > 0) bruto = partes.reduce((a, b) => a + b, 0)
+        }
         if (textoCelda(bruto) === '') {
           if (id === 'total') return void rechazos.push({ fila, motivo: 'Falta el importe total' })
           o[id] = 0
@@ -90,6 +98,11 @@ export function validarFilas(
         if (n === null) return void rechazos.push({ fila, motivo: `El importe "${textoCelda(bruto)}" no es un número válido` })
         o[id] = Math.round(n * 100) / 100
       }
+    }
+
+    if (tipo !== 'pagos' && TIPOS_SIN_IVA.has(Number(o.tipo_cbte))) {
+      const desglose = ['neto_gravado', 'neto_no_gravado', 'exento', 'otros_tributos', 'iva'].reduce((a, id) => a + Math.abs(Number(o[id])), 0)
+      if (desglose === 0 && Number(o.total) !== 0) o.neto_no_gravado = o.total
     }
 
     const clave = claveFila(tipo, o)

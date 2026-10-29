@@ -6,6 +6,7 @@ import { descargarCsv, fechaHora, formatoCuit, hoyLocal, mensajeDb, pesos } from
 import { camposDe, detectarColumnas, encontrarEncabezado, plantillaCsv, TIPO_LABEL, type TipoImportacion } from '../importar/columnas'
 import { leerArchivo, type Leido } from '../importar/leer'
 import { MAX_FILAS, validarFilas } from '../importar/validar'
+import { normalizar } from '../importar/valores'
 
 type Props = { estudio: Estudio; permisos: string[] }
 
@@ -65,7 +66,10 @@ export default function Importar({ estudio, permisos }: Props) {
 
   const resultado = useMemo(() => {
     if (!leido || faltantes.length > 0) return null
-    return validarFilas(tipo, leido.filas.slice(filaEnc + 1), mapa, filaEnc + 2, hoyLocal())
+    const alicuotas = leido.filas[filaEnc]
+      .map((h, i) => (normalizar(h).startsWith('impnetogravadoiva') ? i : -1))
+      .filter((i) => i >= 0)
+    return validarFilas(tipo, leido.filas.slice(filaEnc + 1), mapa, filaEnc + 2, hoyLocal(), alicuotas)
   }, [leido, mapa, tipo, filaEnc, faltantes.length])
 
   // Consulta a la base cuales filas ya existen (misma regla de duplicados que usa al guardar).
