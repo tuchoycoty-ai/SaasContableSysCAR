@@ -10,11 +10,13 @@
 //   -> para un CSR generado aqui: sube el .crt que entrego ARCA y verifica que corresponda.
 // POST { accion: 'subir_par', tenant_id, ambiente, alias, crt, key }
 //   -> para un par .crt/.key que ya existia: verifica que se correspondan y los guarda.
+// POST { accion: 'probar_conexion', tenant_id, certificado_id, servicio }
+//   -> pide un ticket de acceso (login WSAA) a ARCA con el certificado guardado. Es una conexion real.
 // POST { accion: 'revocar', tenant_id, certificado_id }
 //   -> marca el certificado como revocado y borra la clave guardada.
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import {
-  claveAPkcs8, claveCorrespondeACertificado, cifrar, descifrar, generarClaveYCsr, leerCertificado,
+  claveAPkcs8, claveCorrespondeACertificado, cifrar, descifrar, firmarCms, generarClaveYCsr, leerCertificado,
 } from './cripto.ts'
 
 const cors = {
@@ -27,6 +29,7 @@ function json(body: unknown, status = 200): Response {
 }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const MAX_TEXTO = 20000
+const SERVICIOS = ['wsfe', 'ws_sr_constancia_inscripcion', 'ws_sr_padron_a13', 'wscdc']
 
 function cuitValido(c: string): boolean {
   if (!/^\d{11}$/.test(c)) return false
@@ -153,7 +156,7 @@ Deno.serve(async (req: Request) => {
       const { error } = await admin.from('arca_certificados').update({
         estado: 'activo', sujeto: Object.entries(datos.sujeto).map(([k, v]) => `${k}=${v}`).join(', '),
         valido_desde: datos.validoDesde.toISOString(), valido_hasta: datos.validoHasta.toISOString(),
-        huella_sha256: datos.huella, activado_en: new Date().toISOString(),
+        huella_sha256: datos.huella, activado_en: new Date().toISOString(), crt_pem: crt,
       }).eq('id', certId)
       if (error) return json({ error: 'No se pudo activar el certificado.' }, 500)
       await auditar('ARCA_CERT_ACTIVADO', { certificado_id: certId, huella: datos.huella, vence: datos.validoHasta.toISOString() })
@@ -187,7 +190,7 @@ Deno.serve(async (req: Request) => {
         id, tenant_id: tenantId, ambiente, alias: alias.slice(0, 60), cuit: datos.cuit, estado: 'activo', origen: 'subido',
         sujeto: Object.entries(datos.sujeto).map(([k, v]) => `${k}=${v}`).join(', '),
         valido_desde: datos.validoDesde.toISOString(), valido_hasta: datos.validoHasta.toISOString(),
-        huella_sha256: datos.huella, creado_por: yo, activado_en: new Date().toISOString(),
+        huella_sha256: datos.huella, creado_por: yo, activado_en: new Date().toISOString(), crt_pem: crt,
       })
       if (e1) {
         return json({ error: e1.code === '23505' ? 'Ya hay un certificado o pedido vigente para ese ambiente. Revocalo primero.' : 'No se pudo guardar el certificado.' }, 409)
@@ -202,12 +205,83 @@ Deno.serve(async (req: Request) => {
     }
 
     // ---------- Revocar ----------
+    // ---------- Probar la conexion real con ARCA (login WSAA) ----------
+    if (accion === 'probar_conexion') {
+      const certId = texto(body.certificado_id)
+      const servicio = texto(body.servicio)
+      if (!UUID.test(certId)) return json({ error: 'Certificado inválido.' }, 400)
+      if (!SERVICIOS.includes(servicio)) return json({ error: 'Servicio no permitido.' }, 400)
+      const { data: fila } = await admin.from('arca_certificados').select('*').eq('id', certId).eq('tenant_id', tenantId).maybeSingle()
+      if (!fila || fila.estado !== 'activo') return json({ error: 'No hay un certificado activo para probar.' }, 404)
+      if (fila.valido_hasta && new Date(fila.valido_hasta).getTime() < Date.now()) return json({ error: 'El certificado está vencido.' }, 400)
+
+      // Si ya hay un ticket vigente se reutiliza (ARCA no permite pedir otro mientras dure)
+      const { data: previo } = await admin.from('arca_tickets').select('expira').eq('certificado_id', certId).eq('servicio', servicio).maybeSingle()
+      if (previo && new Date(previo.expira).getTime() > Date.now() + 5 * 60000) {
+        return json({ ok: true, reutilizado: true, servicio, expira: previo.expira })
+      }
+
+      const { data: sec } = await admin.from('arca_secretos').select('clave_cifrada').eq('certificado_id', certId).maybeSingle()
+      if (!sec) return json({ error: 'No se encontró la clave del certificado.' }, 404)
+      let pkcs8: Uint8Array
+      try {
+        pkcs8 = await descifrar(secreto, sec.clave_cifrada, certId)
+      } catch {
+        return json({ error: 'No se pudo leer la clave guardada (¿cambió el secreto de cifrado?).' }, 500)
+      }
+      if (!fila.crt_pem) return json({ error: 'Falta el contenido del certificado. Revocá este certificado y volvé a cargarlo.' }, 409)
+      const cert = await leerCertificado(fila.crt_pem)
+
+      const ahora = new Date()
+      const ar = (d: Date) => new Date(d.getTime() - 3 * 3600000).toISOString().slice(0, 19) + '-03:00'
+      const tra = `<?xml version="1.0" encoding="UTF-8"?><loginTicketRequest version="1.0"><header><uniqueId>${Math.floor(ahora.getTime() / 1000)}</uniqueId>` +
+        `<generationTime>${ar(new Date(ahora.getTime() - 600000))}</generationTime><expirationTime>${ar(new Date(ahora.getTime() + 600000))}</expirationTime></header>` +
+        `<service>${servicio}</service></loginTicketRequest>`
+      const cms = await firmarCms(pkcs8, cert, new TextEncoder().encode(tra), ahora)
+      const sobre = `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:wsaa="http://wsaa.view.sua.dvadac.desein.afip.gov"><soapenv:Header/><soapenv:Body><wsaa:loginCms><wsaa:in0>${cms}</wsaa:in0></wsaa:loginCms></soapenv:Body></soapenv:Envelope>`
+      const destino = fila.ambiente === 'produccion' ? 'https://wsaa.afip.gov.ar/ws/services/LoginCms' : 'https://wsaahomo.afip.gov.ar/ws/services/LoginCms'
+
+      let respuesta: string
+      try {
+        const r = await fetch(destino, { method: 'POST', headers: { 'Content-Type': 'text/xml; charset=utf-8', SOAPAction: '""' }, body: sobre, signal: AbortSignal.timeout(25000) })
+        respuesta = await r.text()
+      } catch {
+        await auditar('ARCA_LOGIN', { certificado_id: certId, servicio, ambiente: fila.ambiente, motivo: 'sin conexión con ARCA' }, 'error')
+        return json({ error: 'No se pudo conectar con ARCA. Probá de nuevo en unos minutos.' }, 502)
+      }
+      const falla = /<faultstring>([\s\S]*?)<\/faultstring>/.exec(respuesta)
+      if (falla) {
+        const msg = falla[1].replace(/&[a-z]+;/g, ' ').trim().slice(0, 300)
+        await auditar('ARCA_LOGIN', { certificado_id: certId, servicio, ambiente: fila.ambiente, respuesta: msg }, 'error')
+        if (/alreadyAuthenticated/i.test(msg)) {
+          return json({ ok: true, ya_autenticado: true, servicio, aviso: 'ARCA ya tiene un ticket vigente para este certificado y servicio (por ejemplo, de otra aplicación que usa el mismo certificado). El certificado es válido; el sistema podrá pedir su propio ticket cuando ese venza.' })
+        }
+        if (/not.*authorized|no.*autorizaci|notAuthorized/i.test(msg)) {
+          return json({ error: 'El certificado es válido pero NO está autorizado para el servicio «' + servicio + '». Hay que asociarlo en ARCA («Administrador de Relaciones de Clave Fiscal»). Respuesta de ARCA: ' + msg }, 403)
+        }
+        return json({ error: 'ARCA rechazó el login: ' + msg }, 502)
+      }
+      const ret = /<loginCmsReturn>([\s\S]*?)<\/loginCmsReturn>/.exec(respuesta)
+      const xml = ret ? ret[1].replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&') : ''
+      const token = /<token>([\s\S]*?)<\/token>/.exec(xml)?.[1]
+      const sign = /<sign>([\s\S]*?)<\/sign>/.exec(xml)?.[1]
+      const expira = /<expirationTime>([\s\S]*?)<\/expirationTime>/.exec(xml)?.[1]
+      if (!token || !sign || !expira || isNaN(new Date(expira).getTime())) {
+        await auditar('ARCA_LOGIN', { certificado_id: certId, servicio, motivo: 'respuesta sin ticket' }, 'error')
+        return json({ error: 'ARCA respondió pero sin un ticket válido. No se guardó nada.' }, 502)
+      }
+      await admin.from('arca_tickets').upsert({ certificado_id: certId, servicio, token, sign, expira: new Date(expira).toISOString() })
+      await auditar('ARCA_LOGIN', { certificado_id: certId, servicio, ambiente: fila.ambiente, expira: new Date(expira).toISOString() })
+      return json({ ok: true, servicio, expira: new Date(expira).toISOString() })
+    }
+
     if (accion === 'revocar') {
       const certId = texto(body.certificado_id)
       if (!UUID.test(certId)) return json({ error: 'Certificado inválido.' }, 400)
       const { data: fila } = await admin.from('arca_certificados').select('id, estado').eq('id', certId).eq('tenant_id', tenantId).maybeSingle()
       if (!fila || fila.estado === 'revocado') return json({ error: 'No se encontró un certificado vigente.' }, 404)
       await admin.from('arca_secretos').delete().eq('certificado_id', certId)
+      await admin.from('arca_tickets').delete().eq('certificado_id', certId)
       await admin.from('arca_certificados').update({ estado: 'revocado' }).eq('id', certId)
       await auditar('ARCA_CERT_REVOCADO', { certificado_id: certId })
       return json({ ok: true })

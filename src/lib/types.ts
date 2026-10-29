@@ -170,6 +170,7 @@ export type CertificadoArca = {
   estado: 'csr_generado' | 'activo' | 'revocado'
   origen: 'generado_aqui' | 'subido'
   csr_pem: string | null
+  crt_pem: string | null
   sujeto: string | null
   valido_desde: string | null
   valido_hasta: string | null

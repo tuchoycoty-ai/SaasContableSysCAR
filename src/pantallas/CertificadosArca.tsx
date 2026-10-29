@@ -43,6 +43,8 @@ export default function CertificadosArca({ estudio }: { estudio: Estudio }) {
   const [orgCsr, setOrgCsr] = useState(estudio.nombre)
   const [aliasCsr, setAliasCsr] = useState('syscar')
 
+  const [servicio, setServicio] = useState('wsfe')
+
   // Subir .crt de un pedido
   const [crtPedido, setCrtPedido] = useState<Record<string, File | null>>({})
 
@@ -98,6 +100,14 @@ export default function CertificadosArca({ estudio }: { estudio: Estudio }) {
     }
   }
 
+  async function probar(c: CertificadoArca) {
+    const r = await llamar({ accion: 'probar_conexion', certificado_id: c.id, servicio })
+    if (!r) return
+    if (r.ya_autenticado) setOk(String(r.aviso))
+    else if (r.reutilizado) setOk(`Conexión con ARCA verificada: ya hay un ticket vigente para «${servicio}» (vence ${new Date(String(r.expira)).toLocaleString('es-AR')}).`)
+    else setOk(`Conexión real con ARCA verificada: se obtuvo un ticket de acceso para «${servicio}» (vence ${new Date(String(r.expira)).toLocaleString('es-AR')}).`)
+  }
+
   async function revocar(c: CertificadoArca) {
     if (!window.confirm(`¿Revocar el certificado «${c.alias}» (${AMBIENTE[c.ambiente]})? Se borra la clave guardada y no se puede deshacer.`)) return
     const r = await llamar({ accion: 'revocar', certificado_id: c.id })
@@ -148,6 +158,17 @@ export default function CertificadosArca({ estudio }: { estudio: Estudio }) {
                           <button type="button" className="secundario" onClick={() => bajar(`syscar-${c.ambiente}-${c.cuit}.csr`, c.csr_pem ?? '')}>Descargar .csr</button>{' '}
                           <input type="file" accept=".crt,.pem,.cer" aria-label="Archivo .crt de ARCA" onChange={(e) => setCrtPedido((x) => ({ ...x, [c.id]: e.target.files?.[0] ?? null }))} />{' '}
                           <button type="button" disabled={trabajando || !crtPedido[c.id]} onClick={() => subirCrt(c.id)}>Subir .crt</button>{' '}
+                        </>
+                      )}
+                      {c.estado === 'activo' && !vencido && (
+                        <>
+                          <select value={servicio} aria-label="Servicio de ARCA a probar" onChange={(e) => setServicio(e.target.value)}>
+                            <option value="wsfe">Facturación (wsfe)</option>
+                            <option value="ws_sr_constancia_inscripcion">Constancia de inscripción</option>
+                            <option value="ws_sr_padron_a13">Padrón A13</option>
+                            <option value="wscdc">Constatación de comprobantes</option>
+                          </select>{' '}
+                          <button type="button" disabled={trabajando} onClick={() => probar(c)}>Probar conexión con ARCA</button>{' '}
                         </>
                       )}
                       <button type="button" className="secundario" disabled={trabajando} onClick={() => revocar(c)}>Revocar</button>

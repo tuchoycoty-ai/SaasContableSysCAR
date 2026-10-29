@@ -107,4 +107,4 @@ npm run dev
 - El sistema **verifica que el .crt corresponda a la clave** (módulo y exponente) y que no esté vencido; si no coinciden, no guarda nada. Avisa 30 días antes del vencimiento.
 - Un certificado vigente por estudio y ambiente (homologación / producción). Todo queda en auditoría.
 - Probado: generación de CSR validada con OpenSSL, lectura de certificados, pares correctos/cruzados, claves PKCS#1 y PKCS#8, claves con contraseña rechazadas, cifrado (`supabase/functions/arca-certificados/cripto.ts`).
-- Todavía **no** hay conexión con ARCA (login WSAA y servicios): es el siguiente paso de esta fase.
+- **Login real con ARCA (WSAA)**: botón «Probar conexión con ARCA» por certificado y servicio. El sistema arma y firma el pedido (CMS/PKCS#7, verificado contra OpenSSL), lo envía al WSAA de ARCA (producción u homologación según el certificado) y guarda el ticket (`arca_tickets`, solo accesible desde el servidor) para reutilizarlo ~12 h. Si otra aplicación ya tiene un ticket vigente con el mismo certificado, ARCA lo indica y se informa.\n- Todavía no se consume ningún servicio de negocio (comprobantes, padrón): siguiente paso.

@@ -126,6 +126,9 @@ export type DatosCertificado = {
   spki: Uint8Array
   huella: string
   cuit: string | null
+  der: Uint8Array
+  emisorDer: Uint8Array
+  serialDer: Uint8Array
 }
 
 export async function leerCertificado(textoPem: string): Promise<DatosCertificado> {
@@ -144,6 +147,7 @@ export async function leerCertificado(textoPem: string): Promise<DatosCertificad
   return {
     sujeto, emisor, validoDesde: fecha(der, desde), validoHasta: fecha(der, hasta),
     spki: der.slice(spkiTlv.ini0, spkiTlv.fin), huella, cuit: m ? m[1] : null,
+    der, emisorDer: der.slice(campos[i + 2].ini0, campos[i + 2].fin), serialDer: der.slice(campos[i].ini0, campos[i].fin),
   }
 }
 
@@ -221,4 +225,43 @@ export async function descifrar(secreto: string, texto: string, contexto: string
   if (!texto.startsWith('v1:')) throw new Error('Formato de clave desconocido.')
   const b = deBase64(texto.slice(3))
   return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b.slice(0, 12), additionalData: enc.encode(contexto) }, await claveMaestra(secreto), b.slice(12)))
+}
+
+// ---------- Firma CMS (PKCS#7 SignedData) para el login de ARCA (WSAA) ----------
+const SHA256_ALG = () => tlv(0x30, oid('2.16.840.1.101.3.4.2.1'), new Uint8Array([0x05, 0x00]))
+function comparar(a: Uint8Array, b: Uint8Array): number {
+  for (let i = 0; i < Math.min(a.length, b.length); i++) if (a[i] !== b[i]) return a[i] - b[i]
+  return a.length - b.length
+}
+function utc(d: Date): Uint8Array {
+  const p = (n: number) => String(n).padStart(2, '0')
+  const t = `${String(d.getUTCFullYear()).slice(2)}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}${p(d.getUTCHours())}${p(d.getUTCMinutes())}${p(d.getUTCSeconds())}Z`
+  return tlv(0x17, enc.encode(t))
+}
+
+// Devuelve el CMS en base64 (DER) con el contenido incluido, firmado con SHA-256 y RSA.
+export async function firmarCms(pkcs8: Uint8Array, cert: DatosCertificado, contenido: Uint8Array, ahora = new Date()): Promise<string> {
+  const clave = await importarPrivada(pkcs8)
+  const resumen = new Uint8Array(await crypto.subtle.digest('SHA-256', contenido))
+  const atributos = [
+    tlv(0x30, oid('1.2.840.113549.1.9.3'), tlv(0x31, oid('1.2.840.113549.1.7.1'))),
+    tlv(0x30, oid('1.2.840.113549.1.9.5'), tlv(0x31, utc(ahora))),
+    tlv(0x30, oid('1.2.840.113549.1.9.4'), tlv(0x31, tlv(0x04, resumen))),
+  ].sort(comparar)
+  const aFirmar = tlv(0x31, ...atributos) // la firma se calcula sobre el SET
+  const firma = new Uint8Array(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', clave, aFirmar))
+  const firmante = tlv(0x30,
+    new Uint8Array([0x02, 0x01, 0x01]),
+    tlv(0x30, cert.emisorDer, cert.serialDer),
+    SHA256_ALG(),
+    tlv(0xa0, ...atributos),
+    tlv(0x30, oid('1.2.840.113549.1.1.1'), new Uint8Array([0x05, 0x00])),
+    tlv(0x04, firma))
+  const datos = tlv(0x30,
+    new Uint8Array([0x02, 0x01, 0x01]),
+    tlv(0x31, SHA256_ALG()),
+    tlv(0x30, oid('1.2.840.113549.1.7.1'), tlv(0xa0, tlv(0x04, contenido))),
+    tlv(0xa0, cert.der),
+    tlv(0x31, firmante))
+  return aBase64(tlv(0x30, oid('1.2.840.113549.1.7.2'), tlv(0xa0, datos)))
 }
