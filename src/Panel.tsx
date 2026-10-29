@@ -77,13 +77,14 @@ export default function Panel({ session }: { session: Session }) {
     solapas.push({ id: 'roles', nombre: 'Roles' })
     solapas.push({ id: 'auditoria', nombre: 'Auditoría' })
   }
-  if (esHolding) solapas.push({ id: 'estudios', nombre: 'Estudios' })
+  if (esHolding) solapas.push({ id: 'estudios', nombre: 'Holding' })
   const actual: Vista | null = solapas.some((s) => s.id === vista) ? vista : (solapas[0]?.id ?? null)
 
   return (
     <main className="tarjeta ancha">
       <header className="barra">
         <h1>SysCAR</h1>
+        {esHolding && <span className="badge vigente">Superadministrador del holding</span>}
         <span className="suave">{session.user.email}</span>
         <button className="secundario" onClick={() => supabase.auth.signOut()}>Salir</button>
       </header>

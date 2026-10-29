@@ -48,7 +48,10 @@ export default function Estudios({ estudios, onCambio, onCreado }: Props) {
 
   return (
     <section>
-      <h2>Estudios registrados</h2>
+      <h2>Holding · estudios registrados</h2>
+      <p className="suave">
+        Desde acá administrás todos los estudios de la plataforma. Los administradores de cada estudio no ven esta sección.
+      </p>
       {estudios.length === 0 ? (
         <p className="suave">Todavía no hay estudios. Creá el primero abajo.</p>
       ) : (
