@@ -58,3 +58,29 @@ export const REGIMEN_LABEL: Record<Regimen, string> = {
 }
 
 export const CATEGORIAS_MONOTRIBUTO = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']
+
+export type EstadoDato = 'confirmado' | 'importado' | 'pendiente_validacion'
+
+export type LoteImportacion = {
+  id: string
+  tenant_id: string
+  client_id: string
+  tipo: 'comprobantes_emitidos' | 'comprobantes_recibidos' | 'pagos'
+  archivo_nombre: string
+  estado: 'importado' | 'validado' | 'anulado'
+  filas_total: number
+  filas_importadas: number
+  filas_duplicadas: number
+  filas_rechazadas: number
+  filas_pendientes: number
+  informe: { fila: number; tipo: 'rechazo' | 'duplicado'; motivo: string }[]
+  creado_por: string
+  creado_en: string
+  validado_por: string | null
+  validado_en: string | null
+  anulado_por: string | null
+  anulado_en: string | null
+  motivo_anulacion: string | null
+}
+
+export type ClienteBasico = { id: string; cuit: string; razon_social: string }

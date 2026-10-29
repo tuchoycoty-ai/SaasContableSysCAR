@@ -23,6 +23,24 @@ datos y autenticación en Supabase, siempre mediante el SDK oficial (`@supabase/
 - **Auditoría:** registro automático (por triggers) visible para el holding y los administradores.
 - Pruebas: `supabase/tests/aislamiento.sql` (30) y `supabase/tests/fase2.sql` (28).
 
+### Fase 3 (hecha): importaciones y tablero
+- **Importar** CSV o XLSX (comprobantes emitidos, recibidos y pagos de impuestos). El archivo se lee en el navegador;
+  se detectan las columnas del export de ARCA "Mis Comprobantes" (y se pueden corregir a mano), se muestra una vista previa
+  con filas nuevas, ya existentes, repetidas y rechazadas (con motivo y descarga del informe) y recién ahí se confirma.
+- **Duplicados:** mismo cliente + sentido + tipo + punto de venta + número (en recibidos, también el emisor). En pagos:
+  fecha + importe + concepto + referencia. El mismo archivo no se puede importar dos veces mientras su lote esté vigente.
+- **Estados del dato:** `importado`, `pendiente_validacion` (la base detecta advertencias: total que no cierra, CUIT inválido,
+  moneda extranjera) y `confirmado` (un usuario con permiso valida el lote). Las notas de crédito se guardan restando.
+- **Historial** con responsable, fecha y resultado de cada lote. **Anular** un lote es una operación explícita
+  (solo administrador, con motivo) que queda en la auditoría; después se puede reprocesar el archivo corregido.
+- **Tablero** por cliente y período: facturado, compras, IVA débito/crédito, posición de IVA **estimada** (no es una liquidación),
+  pagos, cantidad de comprobantes y evolución mensual, separando confirmado / importado / pendiente de validación.
+  VEP, DDJJ, alertas, tareas e indicadores financieros figuran como "todavía no disponible": no hay números de relleno.
+- Seguridad: `import_batches`, `comprobantes` y `pagos` no admiten escritura directa; todo pasa por funciones de la base que
+  validan permiso (`importaciones.gestionar`), cliente asignado y datos. El holding no lee estos datos.
+- Pruebas: `supabase/tests/fase3.sql` (32 comprobaciones) y `npm run test:importar` (lectura y validación).
+- Límites: 5000 filas y 5 MB por archivo. Importes en moneda extranjera quedan pendientes de validación.
+
 ### Reglas que garantiza la base
 - Un estudio nunca ve ni escribe datos de otro.
 - Un estudio suspendido pierde el acceso al instante.
@@ -32,7 +50,7 @@ datos y autenticación en Supabase, siempre mediante el SDK oficial (`@supabase/
 - La auditoría solo se escribe por triggers; nadie puede modificarla ni borrarla.
 
 ### Pendiente
-Importaciones y dashboard (Fase 3), motor de tareas (Fase 4), integración ARCA (Fase 5), VEP y
+Motor de tareas (Fase 4), integración ARCA (Fase 5), VEP y
 declaraciones juradas (Fase 6), reportes y puesta en producción (Fase 7).
 No hay datos de demostración ni conexión simulada con ARCA.
 

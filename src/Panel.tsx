@@ -7,8 +7,10 @@ import Usuarios from './pantallas/Usuarios'
 import Roles from './pantallas/Roles'
 import Auditoria from './pantallas/Auditoria'
 import Estudios from './pantallas/Estudios'
+import Tablero from './pantallas/Tablero'
+import Importar from './pantallas/Importar'
 
-type Vista = 'clientes' | 'usuarios' | 'roles' | 'auditoria' | 'estudios'
+type Vista = 'tablero' | 'importar' | 'clientes' | 'usuarios' | 'roles' | 'auditoria' | 'estudios'
 
 export default function Panel({ session }: { session: Session }) {
   const yo = session.user.id
@@ -17,7 +19,7 @@ export default function Panel({ session }: { session: Session }) {
   const [estudioId, setEstudioId] = useState('')
   const [permisos, setPermisos] = useState<string[]>([])
   const [soyMiembro, setSoyMiembro] = useState(false)
-  const [vista, setVista] = useState<Vista>('clientes')
+  const [vista, setVista] = useState<Vista>('tablero')
   const [listo, setListo] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -71,7 +73,11 @@ export default function Panel({ session }: { session: Session }) {
   const gestiona = esAdmin || esHolding
 
   const solapas: { id: Vista; nombre: string }[] = []
-  if (estudio && soyMiembro) solapas.push({ id: 'clientes', nombre: 'Clientes' })
+  if (estudio && soyMiembro) {
+    solapas.push({ id: 'tablero', nombre: 'Tablero' })
+    solapas.push({ id: 'clientes', nombre: 'Clientes' })
+    solapas.push({ id: 'importar', nombre: 'Importar' })
+  }
   if (estudio && gestiona) {
     solapas.push({ id: 'usuarios', nombre: 'Usuarios' })
     solapas.push({ id: 'roles', nombre: 'Roles' })
@@ -128,6 +134,8 @@ export default function Panel({ session }: { session: Session }) {
         </nav>
       )}
 
+      {actual === 'tablero' && estudio && <Tablero key={estudio.id} estudio={estudio} />}
+      {actual === 'importar' && estudio && <Importar key={estudio.id} estudio={estudio} permisos={permisos} />}
       {actual === 'clientes' && estudio && <Clientes key={estudio.id} estudio={estudio} permisos={permisos} />}
       {actual === 'usuarios' && estudio && <Usuarios key={estudio.id} estudio={estudio} yo={yo} />}
       {actual === 'roles' && estudio && <Roles key={estudio.id} estudio={estudio} />}

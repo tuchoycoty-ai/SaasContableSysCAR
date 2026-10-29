@@ -89,3 +89,20 @@ export async function mensajeDeFuncion(error: unknown): Promise<string> {
   }
   return 'No se pudo completar la operación.'
 }
+
+const formatoMoneda = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' })
+export function pesos(n: number | null | undefined): string {
+  return formatoMoneda.format(Number(n ?? 0))
+}
+
+// Baja un texto como archivo CSV (con BOM para que Excel respete los acentos).
+export function descargarCsv(nombre: string, filas: (string | number)[][]) {
+  const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`
+  const texto = '﻿' + filas.map((f) => f.map(esc).join(';')).join('\r\n')
+  const url = URL.createObjectURL(new Blob([texto], { type: 'text/csv;charset=utf-8' }))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = nombre
+  a.click()
+  URL.revokeObjectURL(url)
+}
