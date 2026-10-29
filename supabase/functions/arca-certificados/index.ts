@@ -18,6 +18,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 import {
   claveAPkcs8, claveCorrespondeACertificado, cifrar, descifrar, firmarCms, generarClaveYCsr, leerCertificado,
 } from './cripto.ts'
+import { interpretarPersona } from './padron.ts'
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -30,6 +31,7 @@ function json(body: unknown, status = 200): Response {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const MAX_TEXTO = 20000
 const SERVICIOS = ['wsfe', 'ws_sr_constancia_inscripcion', 'ws_sr_padron_a13', 'wscdc']
+const PADRON_URL = { produccion: 'https://aws.arca.gov.ar/sr-padron/webservices/personaServiceA5', homologacion: 'https://awshomo.arca.gov.ar/sr-padron/webservices/personaServiceA5' }
 
 function cuitValido(c: string): boolean {
   if (!/^\d{11}$/.test(c)) return false
@@ -93,7 +95,12 @@ Deno.serve(async (req: Request) => {
         autorizado = Boolean(rol?.es_admin)
       }
     }
-    if (!autorizado) return json({ error: 'No tenés permiso para administrar los certificados de este estudio.' }, 403)
+    // Consultar un CUIT lo puede hacer quien edita clientes; todo lo demas es solo del administrador.
+    if (!autorizado && accion === 'consultar_cuit') {
+      const { data: permisos } = await porUsuario.rpc('mis_permisos', { p_tenant: tenantId })
+      autorizado = Array.isArray(permisos) && permisos.includes('clientes.editar')
+    }
+    if (!autorizado) return json({ error: 'No tenés permiso para esto en este estudio.' }, 403)
 
     const ambiente = texto(body.ambiente)
     const ambienteOk = ambiente === 'homologacion' || ambiente === 'produccion'
@@ -206,30 +213,23 @@ Deno.serve(async (req: Request) => {
 
     // ---------- Revocar ----------
     // ---------- Probar la conexion real con ARCA (login WSAA) ----------
-    if (accion === 'probar_conexion') {
-      const certId = texto(body.certificado_id)
-      const servicio = texto(body.servicio)
-      if (!UUID.test(certId)) return json({ error: 'Certificado inválido.' }, 400)
-      if (!SERVICIOS.includes(servicio)) return json({ error: 'Servicio no permitido.' }, 400)
-      const { data: fila } = await admin.from('arca_certificados').select('*').eq('id', certId).eq('tenant_id', tenantId).maybeSingle()
-      if (!fila || fila.estado !== 'activo') return json({ error: 'No hay un certificado activo para probar.' }, 404)
-      if (fila.valido_hasta && new Date(fila.valido_hasta).getTime() < Date.now()) return json({ error: 'El certificado está vencido.' }, 400)
-
-      // Si ya hay un ticket vigente se reutiliza (ARCA no permite pedir otro mientras dure)
-      const { data: previo } = await admin.from('arca_tickets').select('expira').eq('certificado_id', certId).eq('servicio', servicio).maybeSingle()
+    // Obtiene un ticket de ARCA (reutiliza el vigente; si no, hace el login firmado).
+    type Ticket = { ok: true; token: string; sign: string; expira: string; reutilizado: boolean } | { ok: false; status: number; body: Record<string, unknown> }
+    async function obtenerTicket(fila: Record<string, any>, servicio: string): Promise<Ticket> {
+      const certId = fila.id as string
+      const { data: previo } = await admin.from('arca_tickets').select('token, sign, expira').eq('certificado_id', certId).eq('servicio', servicio).maybeSingle()
       if (previo && new Date(previo.expira).getTime() > Date.now() + 5 * 60000) {
-        return json({ ok: true, reutilizado: true, servicio, expira: previo.expira })
+        return { ok: true, token: previo.token, sign: previo.sign, expira: previo.expira, reutilizado: true }
       }
-
       const { data: sec } = await admin.from('arca_secretos').select('clave_cifrada').eq('certificado_id', certId).maybeSingle()
-      if (!sec) return json({ error: 'No se encontró la clave del certificado.' }, 404)
+      if (!sec) return { ok: false, status: 404, body: { error: 'No se encontró la clave del certificado.' } }
       let pkcs8: Uint8Array
       try {
         pkcs8 = await descifrar(secreto, sec.clave_cifrada, certId)
       } catch {
-        return json({ error: 'No se pudo leer la clave guardada (¿cambió el secreto de cifrado?).' }, 500)
+        return { ok: false, status: 500, body: { error: 'No se pudo leer la clave guardada (¿cambió el secreto de cifrado?).' } }
       }
-      if (!fila.crt_pem) return json({ error: 'Falta el contenido del certificado. Revocá este certificado y volvé a cargarlo.' }, 409)
+      if (!fila.crt_pem) return { ok: false, status: 409, body: { error: 'Falta el contenido del certificado. Revocá este certificado y volvé a cargarlo.' } }
       const cert = await leerCertificado(fila.crt_pem)
 
       const ahora = new Date()
@@ -247,19 +247,19 @@ Deno.serve(async (req: Request) => {
         respuesta = await r.text()
       } catch {
         await auditar('ARCA_LOGIN', { certificado_id: certId, servicio, ambiente: fila.ambiente, motivo: 'sin conexión con ARCA' }, 'error')
-        return json({ error: 'No se pudo conectar con ARCA. Probá de nuevo en unos minutos.' }, 502)
+        return { ok: false, status: 502, body: { error: 'No se pudo conectar con ARCA. Probá de nuevo en unos minutos.' } }
       }
       const falla = /<faultstring>([\s\S]*?)<\/faultstring>/.exec(respuesta)
       if (falla) {
         const msg = falla[1].replace(/&[a-z]+;/g, ' ').trim().slice(0, 300)
         await auditar('ARCA_LOGIN', { certificado_id: certId, servicio, ambiente: fila.ambiente, respuesta: msg }, 'error')
         if (/alreadyAuthenticated/i.test(msg)) {
-          return json({ ok: true, ya_autenticado: true, servicio, aviso: 'ARCA ya tiene un ticket vigente para este certificado y servicio (por ejemplo, de otra aplicación que usa el mismo certificado). El certificado es válido; el sistema podrá pedir su propio ticket cuando ese venza.' })
+          return { ok: false, status: 200, body: { ok: true, ya_autenticado: true, servicio, aviso: 'ARCA ya tiene un ticket vigente para este certificado y servicio (por ejemplo, de otra aplicación que usa el mismo certificado). El certificado es válido; el sistema podrá pedir su propio ticket cuando ese venza.' } }
         }
         if (/not.*authorized|no.*autorizaci|notAuthorized/i.test(msg)) {
-          return json({ error: 'El certificado es válido pero NO está autorizado para el servicio «' + servicio + '». Hay que asociarlo en ARCA («Administrador de Relaciones de Clave Fiscal»). Respuesta de ARCA: ' + msg }, 403)
+          return { ok: false, status: 403, body: { error: 'El certificado es válido pero NO está autorizado para el servicio «' + servicio + '». Hay que asociarlo en ARCA («Administrador de Relaciones de Clave Fiscal»). Respuesta de ARCA: ' + msg } }
         }
-        return json({ error: 'ARCA rechazó el login: ' + msg }, 502)
+        return { ok: false, status: 502, body: { error: 'ARCA rechazó el login: ' + msg } }
       }
       const ret = /<loginCmsReturn>([\s\S]*?)<\/loginCmsReturn>/.exec(respuesta)
       const xml = ret ? ret[1].replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&') : ''
@@ -268,11 +268,65 @@ Deno.serve(async (req: Request) => {
       const expira = /<expirationTime>([\s\S]*?)<\/expirationTime>/.exec(xml)?.[1]
       if (!token || !sign || !expira || isNaN(new Date(expira).getTime())) {
         await auditar('ARCA_LOGIN', { certificado_id: certId, servicio, motivo: 'respuesta sin ticket' }, 'error')
-        return json({ error: 'ARCA respondió pero sin un ticket válido. No se guardó nada.' }, 502)
+        return { ok: false, status: 502, body: { error: 'ARCA respondió pero sin un ticket válido. No se guardó nada.' } }
       }
-      await admin.from('arca_tickets').upsert({ certificado_id: certId, servicio, token, sign, expira: new Date(expira).toISOString() })
-      await auditar('ARCA_LOGIN', { certificado_id: certId, servicio, ambiente: fila.ambiente, expira: new Date(expira).toISOString() })
-      return json({ ok: true, servicio, expira: new Date(expira).toISOString() })
+      const expiraIso = new Date(expira).toISOString()
+      await admin.from('arca_tickets').upsert({ certificado_id: certId, servicio, token, sign, expira: expiraIso })
+      await auditar('ARCA_LOGIN', { certificado_id: certId, servicio, ambiente: fila.ambiente, expira: expiraIso })
+      return { ok: true, token, sign, expira: expiraIso, reutilizado: false }
+    }
+
+    // ---------- Probar la conexion real con ARCA (login WSAA) ----------
+    if (accion === 'probar_conexion') {
+      const certId = texto(body.certificado_id)
+      const servicio = texto(body.servicio)
+      if (!UUID.test(certId)) return json({ error: 'Certificado inválido.' }, 400)
+      if (!SERVICIOS.includes(servicio)) return json({ error: 'Servicio no permitido.' }, 400)
+      const { data: fila } = await admin.from('arca_certificados').select('*').eq('id', certId).eq('tenant_id', tenantId).maybeSingle()
+      if (!fila || fila.estado !== 'activo') return json({ error: 'No hay un certificado activo para probar.' }, 404)
+      if (fila.valido_hasta && new Date(fila.valido_hasta).getTime() < Date.now()) return json({ error: 'El certificado está vencido.' }, 400)
+      const t = await obtenerTicket(fila, servicio)
+      if (!t.ok) return json(t.body, t.status)
+      return json({ ok: true, reutilizado: t.reutilizado, servicio, expira: t.expira })
+    }
+
+    // ---------- Consultar un CUIT en el padron de ARCA ----------
+    if (accion === 'consultar_cuit') {
+      const cuit = texto(body.cuit).replace(/\D/g, '')
+      if (!cuitValido(cuit)) return json({ error: 'El CUIT no es válido. Revisá los 11 dígitos.' }, 400)
+      // Se usa el certificado activo del estudio (producción si existe; si no, homologación)
+      const { data: certs } = await admin.from('arca_certificados').select('*').eq('tenant_id', tenantId).eq('estado', 'activo')
+      const fila = (certs ?? []).find((c) => c.ambiente === 'produccion') ?? (certs ?? [])[0]
+      if (!fila) return json({ error: 'Este estudio todavía no tiene un certificado de ARCA activo. Cargalo en «Certificados ARCA».' }, 409)
+      if (fila.valido_hasta && new Date(fila.valido_hasta).getTime() < Date.now()) return json({ error: 'El certificado del estudio está vencido.' }, 409)
+      const t = await obtenerTicket(fila, 'ws_sr_constancia_inscripcion')
+      if (!t.ok) {
+        if (t.status === 200) return json({ error: 'ARCA tiene un ticket vigente para este certificado que el sistema no puede reutilizar todavía. Probá de nuevo más tarde.' }, 503)
+        return json(t.body, t.status)
+      }
+      const pedir = (operacion: string) => `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:a5="http://a5.soap.ws.server.puc.sr/"><soapenv:Header/><soapenv:Body><a5:${operacion}><token>${t.token}</token><sign>${t.sign}</sign><cuitRepresentada>${fila.cuit}</cuitRepresentada><idPersona>${cuit}</idPersona></a5:${operacion}></soapenv:Body></soapenv:Envelope>`
+      const llamar = async (operacion: string) => {
+        const r = await fetch(PADRON_URL[fila.ambiente as 'produccion' | 'homologacion'], {
+          method: 'POST', headers: { 'Content-Type': 'text/xml; charset=utf-8', SOAPAction: '""' }, body: pedir(operacion), signal: AbortSignal.timeout(25000),
+        })
+        return r.text()
+      }
+      let resp: string
+      try {
+        resp = await llamar('getPersona_v2')
+        if (/<faultstring>[^<]*(getPersona_v2|operation|Operation)/.test(resp) && !/personaReturn/.test(resp)) resp = await llamar('getPersona')
+      } catch {
+        return json({ error: 'No se pudo conectar con el padrón de ARCA. Probá de nuevo en unos minutos.' }, 502)
+      }
+      const falla = /<faultstring>([\s\S]*?)<\/faultstring>/.exec(resp)
+      if (falla && !/personaReturn/.test(resp)) {
+        const msg = falla[1].replace(/&[a-z]+;/g, ' ').trim().slice(0, 300)
+        await auditar('ARCA_PADRON', { cuit_consultado: cuit, respuesta: msg }, 'error')
+        return json({ error: 'El padrón de ARCA respondió con un error: ' + msg }, 502)
+      }
+      const resultado = interpretarPersona(resp)
+      await auditar('ARCA_PADRON', { cuit_consultado: cuit, encontrado: resultado.encontrado })
+      return json(resultado)
     }
 
     if (accion === 'revocar') {

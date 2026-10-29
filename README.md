@@ -108,3 +108,10 @@ npm run dev
 - Un certificado vigente por estudio y ambiente (homologación / producción). Todo queda en auditoría.
 - Probado: generación de CSR validada con OpenSSL, lectura de certificados, pares correctos/cruzados, claves PKCS#1 y PKCS#8, claves con contraseña rechazadas, cifrado (`supabase/functions/arca-certificados/cripto.ts`).
 - **Login real con ARCA (WSAA)**: botón «Probar conexión con ARCA» por certificado y servicio. El sistema arma y firma el pedido (CMS/PKCS#7, verificado contra OpenSSL), lo envía al WSAA de ARCA (producción u homologación según el certificado) y guarda el ticket (`arca_tickets`, solo accesible desde el servidor) para reutilizarlo ~12 h. Si otra aplicación ya tiene un ticket vigente con el mismo certificado, ARCA lo indica y se informa.\n- Todavía no se consume ningún servicio de negocio (comprobantes, padrón): siguiente paso.
+
+### Consulta de CUIT en el padrón de ARCA (Fase 5)
+
+- En **Clientes → Agregar cliente**, el botón «Completar con datos de ARCA» consulta el CUIT en el servicio `ws_sr_constancia_inscripcion` usando el certificado activo del estudio (acción `consultar_cuit` de la Edge Function `arca-certificados`). Puede usarla el administrador, el holding o quien tenga el permiso `clientes.editar`.
+- Completa razón social, régimen y categoría de monotributo, y muestra domicilio fiscal e impuestos activos. Siempre se revisa antes de guardar.
+- **IVA vs. IVA EXENTO:** `padron.ts` clasifica el texto de la condición evaluando primero «exento», de modo que «IVA EXENTO» nunca se toma como inscripto. Si el texto es ambiguo o no se reconoce, el régimen queda vacío con una advertencia (no se asume nada).
+- Cada consulta queda en auditoría (`ARCA_PADRON`). Se reutiliza el ticket de ARCA guardado (tabla `arca_tickets`).

@@ -8,7 +8,7 @@ import {
   type Estudio,
   type Regimen,
 } from '../lib/types'
-import { cuitValido, ESTADO_LABEL, estadoDelCliente, formatoCuit, mensajeDb, soloDigitos } from '../lib/utiles'
+import { cuitValido, ESTADO_LABEL, estadoDelCliente, formatoCuit, mensajeDb, mensajeDeFuncion, soloDigitos } from '../lib/utiles'
 import FichaCliente from './FichaCliente'
 
 type Props = { estudio: Estudio; permisos: string[] }
@@ -27,6 +27,38 @@ export default function Clientes({ estudio, permisos }: Props) {
   const [razon, setRazon] = useState('')
   const [regimen, setRegimen] = useState<Regimen | ''>('')
   const [categoria, setCategoria] = useState('')
+
+  const [consultando, setConsultando] = useState(false)
+  const [infoArca, setInfoArca] = useState<{ domicilio: string; advertencias: string[]; impuestos: string } | null>(null)
+
+  // Consulta el CUIT en el padron de ARCA (desde el servidor) y completa el formulario.
+  async function consultarArca() {
+    setError(null)
+    setInfoArca(null)
+    const limpio = soloDigitos(cuit)
+    if (!cuitValido(limpio)) return setError('El CUIT no es válido. Revisá los 11 dígitos.')
+    setConsultando(true)
+    const { data, error: err } = await supabase.functions.invoke('arca-certificados', {
+      body: { accion: 'consultar_cuit', tenant_id: estudio.id, cuit: limpio },
+    })
+    setConsultando(false)
+    if (err) return setError(await mensajeDeFuncion(err))
+    const r = data as
+      | { encontrado: false; error: string }
+      | { encontrado: true; persona: { razon_social: string; regimen: Regimen | null; categoria_monotributo: string | null; domicilio: { direccion: string; localidad: string; cp: string; provincia: string } | null; impuestos: { descripcion: string; estado: string }[]; advertencias: string[] } }
+    if (!r.encontrado) return setError('ARCA: ' + r.error)
+    const p = r.persona
+    setRazon(p.razon_social)
+    setRegimen(p.regimen ?? '')
+    setCategoria(p.categoria_monotributo ?? '')
+    const advertencias = [...p.advertencias]
+    if (!p.regimen && advertencias.length === 0) advertencias.push('No se pudo determinar el régimen: elegilo a mano.')
+    setInfoArca({
+      domicilio: p.domicilio ? `${p.domicilio.direccion}, ${p.domicilio.localidad} (${p.domicilio.cp}), ${p.domicilio.provincia}` : 'sin domicilio informado',
+      advertencias,
+      impuestos: p.impuestos.filter((i) => i.estado === 'AC' || i.estado === '').map((i) => i.descripcion).join(' · '),
+    })
+  }
 
   const cargar = useCallback(async () => {
     const [c, a] = await Promise.all([
@@ -174,6 +206,20 @@ export default function Clientes({ estudio, permisos }: Props) {
             </label>
             <button>Guardar cliente</button>
           </form>
+          <p>
+            <button type="button" className="secundario" onClick={consultarArca} disabled={consultando}>
+              {consultando ? 'Consultando ARCA…' : 'Completar con datos de ARCA'}
+            </button>{' '}
+            <span className="suave">Escribí el CUIT y ARCA completa razón social y régimen para evitar errores de tipeo.</span>
+          </p>
+          {infoArca && (
+            <div className="aviso">
+              <strong>Datos informados por ARCA</strong> (revisalos antes de guardar).
+              <br />Domicilio fiscal: {infoArca.domicilio}
+              {infoArca.impuestos && <><br />Impuestos activos: {infoArca.impuestos}</>}
+              {infoArca.advertencias.map((a) => <p key={a}>⚠ {a}</p>)}
+            </div>
+          )}
         </>
       )}
       {error && <p className="error" role="alert">{error}</p>}
