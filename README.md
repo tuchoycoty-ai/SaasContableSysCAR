@@ -98,3 +98,13 @@ npm run dev
 - Los vencimientos se configuran por tarea; el sistema no trae un calendario fiscal cargado.
 - La recategorización necesita los topes oficiales de monotributo (Fase 6).
 - Las operaciones son atómicas: si una falla a mitad de camino, sus escrituras parciales se revierten y se reintenta.
+
+## Fase 5 (en curso) — Certificados ARCA por estudio
+
+- Pestaña **Certificados ARCA** (administrador del estudio y holding): subir un par `.crt` + `.key` existente, o **generar clave y pedido CSR** para un estudio nuevo y luego subir el `.crt` que entrega ARCA.
+- La **clave privada se guarda cifrada** (AES-GCM) en `arca_secretos`, que ni el navegador ni los usuarios pueden leer. Solo la Edge Function `arca-certificados` la maneja. No se puede descargar nunca.
+- El secreto de cifrado (`ARCA_CIFRADO_SECRETO`, mínimo 32 caracteres) se carga **solo** como secreto de Edge Functions en Supabase. No está en el repositorio. Si se pierde, hay que volver a cargar los certificados.
+- El sistema **verifica que el .crt corresponda a la clave** (módulo y exponente) y que no esté vencido; si no coinciden, no guarda nada. Avisa 30 días antes del vencimiento.
+- Un certificado vigente por estudio y ambiente (homologación / producción). Todo queda en auditoría.
+- Probado: generación de CSR validada con OpenSSL, lectura de certificados, pares correctos/cruzados, claves PKCS#1 y PKCS#8, claves con contraseña rechazadas, cifrado (`supabase/functions/arca-certificados/cripto.ts`).
+- Todavía **no** hay conexión con ARCA (login WSAA y servicios): es el siguiente paso de esta fase.

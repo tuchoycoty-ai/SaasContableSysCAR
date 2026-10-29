@@ -160,3 +160,18 @@ export const ESTADO_EJECUCION_LABEL: Record<EstadoEjecucion, string> = {
   fallida: 'Fallida',
   cancelada: 'Cancelada',
 }
+
+export type CertificadoArca = {
+  id: string
+  tenant_id: string
+  ambiente: 'homologacion' | 'produccion'
+  alias: string
+  cuit: string
+  estado: 'csr_generado' | 'activo' | 'revocado'
+  origen: 'generado_aqui' | 'subido'
+  csr_pem: string | null
+  sujeto: string | null
+  valido_desde: string | null
+  valido_hasta: string | null
+  creado_en: string
+}
