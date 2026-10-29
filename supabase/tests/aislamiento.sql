@@ -39,7 +39,7 @@ begin
   select count(*) into n from public.tenants;
   if n <> 1 then raise exception 'FALLO 3: A ve % estudios', n; end if;
   begin
-    insert into public.clients(tenant_id,cuit,razon_social) values (tb,'20999999990','Intruso');
+    insert into public.clients(tenant_id,cuit,razon_social) values (tb,'20444444445','Intruso');
     raise exception 'FALLO 4: A escribio un cliente en B';
   exception when insufficient_privilege then ok := ok || '4 ';
   end;
