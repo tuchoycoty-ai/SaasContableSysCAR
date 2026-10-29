@@ -73,3 +73,28 @@ npm run dev
 
 ## Variables de entorno (Vercel)
 `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY` (ver `.env.example`).
+
+## Fase 4 — Motor de tareas, agenda, reintentos y auditoría
+
+**Qué hace realmente**
+- **Tareas** (pestaña *Tareas*): se elige cliente, operación, frecuencia (manual, una vez, diaria, semanal, mensual), día y hora (zona Argentina), ejecución automática/manual/ambas, período que analiza (mes anterior o en curso), cantidad de reintentos y minutos entre reintentos.
+- **Ejecución automática en el servidor**: un trabajo de `pg_cron` (`syscar-motor-tareas`) corre cada minuto y ejecuta lo vencido. No depende de tener la página abierta.
+- **Operaciones disponibles hoy**: control de carga mensual (¿hay comprobantes emitidos y recibidos del período?), recordatorio de vencimiento (carga un aviso en la agenda con el día que configurás) y control de IVA (débito − crédito estimado y alerta si no hay pago de IVA importado).
+- **Pendientes de integración** (se muestran así y no se pueden programar): importar comprobantes desde ARCA (Fase 5) y revisión de recategorización (Fase 6).
+- **Historial** de cada ejecución con estado, intentos, quién la lanzó, errores y eventos. Nunca se borra. Se puede **relanzar** (queda vinculada a la original) y **cancelar**.
+- **Estados**: programada (la tarea con su próxima ejecución), pendiente, ejecutando, completada, completada parcialmente, fallida, cancelada. Una tarea es «completada» solo si el resultado se pudo validar; si faltan datos o hay datos sin confirmar queda «completada parcialmente».
+- **Reintentos**: un error transitorio reintenta tras el intervalo configurado hasta agotar los intentos; un error de configuración falla de inmediato.
+- **Interrupciones**: si una ejecución queda colgada (reserva de 10 min vencida) se reanuda o, sin intentos, se marca fallida. No se pierde historial.
+- **Duplicados**: índices únicos impiden dos ejecuciones activas de la misma tarea y repetir el mismo horario. Tras una caída larga del planificador se ejecuta solo el horario más reciente; los anteriores quedan registrados como omitidos.
+- **Agenda** (pestaña *Agenda*): avisos con fecha, prioridad y estado; los vencidos se resaltan; los generados por tareas no se pueden borrar ni editar, los manuales sí.
+- El **Tablero** muestra tareas completadas/parciales/fallidas de los últimos 30 días y avisos pendientes.
+
+**Tablas nuevas**: `task_operations` (catálogo), `task_definitions` (configuración), `task_runs` (ejecuciones), `task_run_events` (detalle), `agenda_items` (agenda). Todas con RLS por estudio y por cliente asignado; las escrituras pasan por funciones (`crear_tarea`, `lanzar_tarea`, `relanzar_ejecucion`, `cancelar_ejecucion`, `pausar_tarea`) que verifican el permiso `tareas.gestionar`. Estudios suspendidos no ejecutan tareas. Todo queda en auditoría.
+
+**Pruebas**: `supabase/tests/fase4.sql` (84 comprobaciones: calendario, reintentos con fallo simulado, interrupción, duplicados, recuperación, aislamiento entre estudios, holding, anónimo, permisos y auditoría). Corre en una transacción que siempre se deshace.
+
+**Límites conocidos (honestidad)**
+- Todavía no se puede *editar* una tarea existente (solo pausar/reanudar); hay que crear otra.
+- Los vencimientos se configuran por tarea; el sistema no trae un calendario fiscal cargado.
+- La recategorización necesita los topes oficiales de monotributo (Fase 6).
+- Las operaciones son atómicas: si una falla a mitad de camino, sus escrituras parciales se revierten y se reintenta.

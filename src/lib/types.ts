@@ -84,3 +84,79 @@ export type LoteImportacion = {
 }
 
 export type ClienteBasico = { id: string; cuit: string; razon_social: string }
+
+export type OperacionTarea = {
+  codigo: string
+  modulo: string
+  nombre: string
+  descripcion: string
+  disponible: boolean
+  nota: string | null
+}
+
+export type EstadoEjecucion =
+  | 'programada' | 'pendiente' | 'ejecutando' | 'completada' | 'completada_parcialmente' | 'fallida' | 'cancelada'
+
+export type Tarea = {
+  id: string
+  tenant_id: string
+  client_id: string
+  operacion: string
+  nombre: string
+  frecuencia: 'manual' | 'una_vez' | 'diaria' | 'semanal' | 'mensual'
+  dia: number | null
+  hora: string
+  modo: 'automatica' | 'manual' | 'ambas'
+  periodo_regla: 'mes_anterior' | 'mes_actual'
+  reintentos_max: number
+  reintento_intervalo_min: number
+  parametros: Record<string, unknown>
+  activa: boolean
+  proxima_ejecucion: string | null
+  ultima_ejecucion: string | null
+}
+
+export type Ejecucion = {
+  id: string
+  task_id: string
+  client_id: string
+  estado: EstadoEjecucion
+  disparador: 'manual' | 'automatico'
+  iniciado_por: string | null
+  origen_run_id: string | null
+  periodo: string | null
+  programada_para: string
+  intento: number
+  intentos_max: number
+  proximo_intento: string | null
+  iniciado_en: string | null
+  finalizado_en: string | null
+  resultado: Record<string, unknown> | null
+  error: string | null
+  creado_en: string
+}
+
+export type EventoEjecucion = { id: number; nivel: 'info' | 'aviso' | 'error'; mensaje: string; creado_en: string }
+
+export type ItemAgenda = {
+  id: string
+  client_id: string
+  tipo: 'vencimiento' | 'recordatorio' | 'control' | 'recategorizacion' | 'otro'
+  titulo: string
+  detalle: string | null
+  fecha_limite: string | null
+  prioridad: 'baja' | 'media' | 'alta'
+  estado: 'pendiente' | 'hecho' | 'descartado'
+  origen: 'manual' | 'tarea'
+  creado_en: string
+}
+
+export const ESTADO_EJECUCION_LABEL: Record<EstadoEjecucion, string> = {
+  programada: 'Programada',
+  pendiente: 'Pendiente',
+  ejecutando: 'Ejecutando',
+  completada: 'Completada',
+  completada_parcialmente: 'Completada parcialmente',
+  fallida: 'Fallida',
+  cancelada: 'Cancelada',
+}

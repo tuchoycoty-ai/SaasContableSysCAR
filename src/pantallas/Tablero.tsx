@@ -73,6 +73,27 @@ export default function Tablero({ estudio }: { estudio: Estudio }) {
     }
   }, [estudio.id, clienteId, desde, hasta])
 
+  const [tareas, setTareas] = useState<{ estado: string }[]>([])
+  const [avisos, setAvisos] = useState<{ fecha_limite: string | null }[]>([])
+  useEffect(() => {
+    if (!clienteId) return
+    let cancelado = false
+    const desdeIso = new Date(Date.now() - 30 * 86400000).toISOString()
+    Promise.all([
+      supabase.from('task_runs').select('estado').eq('tenant_id', estudio.id).eq('client_id', clienteId).gte('creado_en', desdeIso),
+      supabase.from('agenda_items').select('fecha_limite').eq('tenant_id', estudio.id).eq('client_id', clienteId).eq('estado', 'pendiente'),
+    ]).then(([t, a]) => {
+      if (cancelado) return
+      setTareas((t.data ?? []) as { estado: string }[])
+      setAvisos((a.data ?? []) as { fecha_limite: string | null }[])
+    })
+    return () => {
+      cancelado = true
+    }
+  }, [estudio.id, clienteId])
+  const cuentaTareas = (...estados: string[]) => tareas.filter((x) => estados.includes(x.estado)).length
+  const avisosVencidos = avisos.filter((a) => a.fecha_limite && a.fecha_limite < hoyLocal()).length
+
   const suma = (rubro: Fila['rubro'], campo: 'neto' | 'iva' | 'total' | 'cantidad', estado?: EstadoDato) =>
     filas.filter((f) => f.rubro === rubro && (!estado || f.estado_dato === estado)).reduce((s, f) => s + f[campo], 0)
 
@@ -236,9 +257,34 @@ export default function Tablero({ estudio }: { estudio: Estudio }) {
         </>
       )}
 
+      {clienteId && (
+        <>
+          <h3>Tareas y avisos</h3>
+          <div className="tarjetas">
+            <div className="indicador">
+              <span className="suave">Tareas completadas (30 días)</span>
+              <strong>{cuentaTareas('completada')}</strong>
+            </div>
+            <div className="indicador">
+              <span className="suave">Parciales, pendientes o en curso</span>
+              <strong>{cuentaTareas('completada_parcialmente', 'pendiente', 'ejecutando', 'programada')}</strong>
+            </div>
+            <div className="indicador">
+              <span className="suave">Tareas fallidas (30 días)</span>
+              <strong className={cuentaTareas('fallida') > 0 ? '' : 'ok'}>{cuentaTareas('fallida')}</strong>
+            </div>
+            <div className="indicador">
+              <span className="suave">Avisos pendientes en la agenda</span>
+              <strong>{avisos.length}</strong>
+              <span className="suave">{avisosVencidos > 0 ? `${avisosVencidos} vencidos` : 'ninguno vencido'}</span>
+            </div>
+          </div>
+        </>
+      )}
+
       <h3>Todavía no disponible</h3>
       <p className="suave">
-        VEP pagados y pendientes, declaraciones juradas, alertas fiscales, tareas e indicadores financieros con previsiones se habilitan en
+        VEP pagados y pendientes, declaraciones juradas, alertas fiscales e indicadores financieros con previsiones se habilitan en
         las próximas fases. No se muestran números de relleno: cuando existan datos reales, aparecen acá.
       </p>
     </section>
