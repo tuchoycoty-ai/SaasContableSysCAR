@@ -127,9 +127,17 @@ export function interpretarPersona(xml: string): Resultado {
   const esMono = Boolean(mono) && (activos.some((i) => clasificarTextoIva(i.descripcion).regimen === 'monotributo') || Boolean(catNodo))
   if (esMono) {
     regimen = 'monotributo'
-    const letra = texto(catNodo?.idCategoria) || /^([A-K])\b/.exec(normalizar(texto(catNodo?.descripcionCategoria)))?.[1] || ''
-    categoria = /^[A-K]$/.test(letra) ? letra : null
-    if (!categoria) advertencias.push('Es monotributista pero ARCA no informó una categoría reconocible: cargala a mano.')
+    // ARCA puede informar la categoria como letra en el id o al inicio de la descripcion («B - Locaciones...»);
+    // si el id es un numero, se ignora y se usa la descripcion.
+    const candidatos = [texto(catNodo?.idCategoria), texto(catNodo?.descripcionCategoria), ...activos.map((i) => i.descripcion)]
+    let letra = ''
+    for (const c of candidatos) {
+      const n = normalizar(c)
+      const m = /^([A-K])$/.exec(n) ?? /^([A-K]) /.exec(n) ?? /\bCATEGORIA ([A-K])\b/.exec(n)
+      if (m) { letra = m[1]; break }
+    }
+    categoria = letra || null
+    if (!categoria) advertencias.push('Es monotributista pero ARCA no informó una categoría reconocible (id «' + texto(catNodo?.idCategoria) + '», descripción «' + texto(catNodo?.descripcionCategoria) + '»): cargala a mano.')
   } else {
     // 2) Regimen general: se clasifica el texto de cada impuesto activo que sea de IVA
     const deIva = activos.filter((i) => /\bIVA\b/.test(normalizar(i.descripcion)))
