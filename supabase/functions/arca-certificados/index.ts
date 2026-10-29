@@ -31,7 +31,10 @@ function json(body: unknown, status = 200): Response {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const MAX_TEXTO = 20000
 const SERVICIOS = ['wsfe', 'ws_sr_constancia_inscripcion', 'ws_sr_padron_a13', 'wscdc']
-const PADRON_URL = { produccion: 'https://aws.arca.gov.ar/sr-padron/webservices/personaServiceA5', homologacion: 'https://awshomo.arca.gov.ar/sr-padron/webservices/personaServiceA5' }
+const PADRON_URL = {
+  produccion: ['https://aws.afip.gov.ar/sr-padron/webservices/personaServiceA5', 'https://aws.arca.gov.ar/sr-padron/webservices/personaServiceA5'],
+  homologacion: ['https://awshomo.afip.gov.ar/sr-padron/webservices/personaServiceA5', 'https://awshomo.arca.gov.ar/sr-padron/webservices/personaServiceA5'],
+}
 
 function cuitValido(c: string): boolean {
   if (!/^\d{11}$/.test(c)) return false
@@ -305,18 +308,25 @@ Deno.serve(async (req: Request) => {
         return json(t.body, t.status)
       }
       const pedir = (operacion: string) => `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:a5="http://a5.soap.ws.server.puc.sr/"><soapenv:Header/><soapenv:Body><a5:${operacion}><token>${t.token}</token><sign>${t.sign}</sign><cuitRepresentada>${fila.cuit}</cuitRepresentada><idPersona>${cuit}</idPersona></a5:${operacion}></soapenv:Body></soapenv:Envelope>`
-      const llamar = async (operacion: string) => {
-        const r = await fetch(PADRON_URL[fila.ambiente as 'produccion' | 'homologacion'], {
-          method: 'POST', headers: { 'Content-Type': 'text/xml; charset=utf-8', SOAPAction: '""' }, body: pedir(operacion), signal: AbortSignal.timeout(25000),
-        })
-        return r.text()
+      const errores: string[] = []
+      const llamar = async (operacion: string): Promise<string | null> => {
+        for (const destino of PADRON_URL[fila.ambiente as 'produccion' | 'homologacion']) {
+          try {
+            const r = await fetch(destino, {
+              method: 'POST', headers: { 'Content-Type': 'text/xml; charset=utf-8', SOAPAction: '""' }, body: pedir(operacion), signal: AbortSignal.timeout(25000),
+            })
+            return await r.text()
+          } catch (e) {
+            errores.push(new URL(destino).host + ': ' + ((e as Error).message ?? 'error').slice(0, 150))
+          }
+        }
+        return null
       }
-      let resp: string
-      try {
-        resp = await llamar('getPersona_v2')
-        if (/<faultstring>[^<]*(getPersona_v2|operation|Operation)/.test(resp) && !/personaReturn/.test(resp)) resp = await llamar('getPersona')
-      } catch {
-        return json({ error: 'No se pudo conectar con el padrón de ARCA. Probá de nuevo en unos minutos.' }, 502)
+      let resp = await llamar('getPersona_v2')
+      if (resp !== null && /<faultstring>[^<]*(getPersona_v2|operation|Operation)/.test(resp) && !/personaReturn/.test(resp)) resp = (await llamar('getPersona')) ?? resp
+      if (resp === null) {
+        await auditar('ARCA_PADRON', { cuit_consultado: cuit, errores }, 'error')
+        return json({ error: 'No se pudo conectar con el padr\u00f3n de ARCA (' + errores.join(' | ') + ').' }, 502)
       }
       const falla = /<faultstring>([\s\S]*?)<\/faultstring>/.exec(resp)
       if (falla && !/personaReturn/.test(resp)) {
