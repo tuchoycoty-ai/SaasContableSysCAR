@@ -50,8 +50,7 @@ datos y autenticación en Supabase, siempre mediante el SDK oficial (`@supabase/
 - La auditoría solo se escribe por triggers; nadie puede modificarla ni borrarla.
 
 ### Pendiente
-Motor de tareas (Fase 4), integración ARCA (Fase 5), VEP y
-declaraciones juradas (Fase 6), reportes y puesta en producción (Fase 7).
+Reportes, análisis financiero, pruebas de seguridad y puesta en producción (Fase 7).
 No hay datos de demostración ni conexión simulada con ARCA.
 
 ## Configuración necesaria en Supabase (panel)
@@ -80,7 +79,7 @@ npm run dev
 - **Tareas** (pestaña *Tareas*): se elige cliente, operación, frecuencia (manual, una vez, diaria, semanal, mensual), día y hora (zona Argentina), ejecución automática/manual/ambas, período que analiza (mes anterior o en curso), cantidad de reintentos y minutos entre reintentos.
 - **Ejecución automática en el servidor**: un trabajo de `pg_cron` (`syscar-motor-tareas`) corre cada minuto y ejecuta lo vencido. No depende de tener la página abierta.
 - **Operaciones disponibles hoy**: control de carga mensual (¿hay comprobantes emitidos y recibidos del período?), recordatorio de vencimiento (carga un aviso en la agenda con el día que configurás) y control de IVA (débito − crédito estimado y alerta si no hay pago de IVA importado).
-- **Pendientes de integración** (se muestran así y no se pueden programar): importar comprobantes desde ARCA (Fase 5) y revisión de recategorización (Fase 6).
+- **Pendientes de integración** (se muestran así y no se pueden programar): importar comprobantes desde ARCA (Fase 5) (la revisión de recategorización ya está disponible desde la Fase 6).
 - **Historial** de cada ejecución con estado, intentos, quién la lanzó, errores y eventos. Nunca se borra. Se puede **relanzar** (queda vinculada a la original) y **cancelar**.
 - **Estados**: programada (la tarea con su próxima ejecución), pendiente, ejecutando, completada, completada parcialmente, fallida, cancelada. Una tarea es «completada» solo si el resultado se pudo validar; si faltan datos o hay datos sin confirmar queda «completada parcialmente».
 - **Reintentos**: un error transitorio reintenta tras el intervalo configurado hasta agotar los intentos; un error de configuración falla de inmediato.
@@ -127,3 +126,24 @@ npm run dev
 **No implementado todavía:** importación automática de comprobantes desde ARCA (la tarea `arca.importar_comprobantes` sigue «pendiente de integración»; ARCA no ofrece un servicio público equivalente a «Mis Comprobantes») y facturación. Nada se simula.
 
 **Pruebas:** `fase5.sql` (15 comprobaciones: aislamiento entre estudios, permisos por rol, claves y tickets inaccesibles desde el navegador, restricciones, auditoría) y las unitarias de `padron.ts` (38 comprobaciones, incluido «IVA EXENTO»).
+
+
+## Fase 6 — Obligaciones, vencimientos, alertas y recategorización
+
+### Cierre de la Fase 6 — qué está realmente implementado
+
+**Archivos:** migraciones `20261030000009_fase6_obligaciones.sql` y `...0010_fase6_ajuste_recategorizacion.sql`; pruebas `supabase/tests/fase6.sql`; pantallas `Obligaciones.tsx`, `Recategorizacion.tsx` y `Vencimientos.tsx` (más cambios en `Panel.tsx` y `types.ts`).
+
+**Tablas:**
+- `obligacion_tipos`: catálogo (IVA DDJJ, cuota de monotributo, F.931).
+- `vencimientos_calendario`: fecha por obligación, período y terminación de CUIT. Es global; solo la edita el holding. Cada fila indica fuente y si fue verificada.
+- `monotributo_escalas`: topes y cuotas por categoría y vigencia (global, solo el holding la edita).
+- `obligaciones_cliente`: por cliente y período, estado (pendiente / presentada / pagada / no corresponde), monto, datos del VEP (número, monto, vencimiento) y fechas. Aislada por estudio con RLS, con auditoría. Permiso nuevo: `obligaciones.gestionar`.
+
+**Real:** generación de obligaciones por régimen del cliente; seguimiento manual de DDJJ y VEP; alertas en la Agenda (vencimientos próximos y vencidos) mediante el motor de tareas (`vencimientos.control_obligaciones`); cálculo de recategorización de monotributo con los comprobantes emitidos de los últimos 12 meses (`recategorizacion.revision`).
+
+**No hace (y no se simula):** no presenta DDJJ ni genera VEP en ARCA, porque ARCA no tiene un servicio público para eso. Solo registrás lo que hiciste. La recategorización evalúa únicamente el tope de ingresos (no superficie, energía, alquileres ni precio unitario).
+
+**A verificar por el holding:** el calendario de noviembre 2026 y la escala de monotributo vigente desde 2026-08-01 se cargaron desde sitios de terceros y quedan «Sin verificar» hasta que se confirmen contra ARCA en la pantalla Vencimientos.
+
+**Pruebas:** `fase6.sql` (47 comprobaciones) y la regresión completa de `fase4.sql` (84 comprobaciones) pasaron.

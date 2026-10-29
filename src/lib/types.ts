@@ -176,3 +176,60 @@ export type CertificadoArca = {
   valido_hasta: string | null
   creado_en: string
 }
+
+export type EstadoObligacion = 'pendiente' | 'presentada' | 'pagada' | 'no_corresponde'
+
+export type ObligacionCliente = {
+  id: string
+  client_id: string
+  obligacion_codigo: string
+  periodo: string
+  estado: EstadoObligacion
+  monto: number | null
+  vep_numero: string | null
+  vep_monto: number | null
+  vep_vence: string | null
+  presentada_en: string | null
+  pagada_en: string | null
+  notas: string | null
+}
+
+export type VencimientoCalendario = {
+  id: string
+  obligacion_codigo: string
+  periodo: string
+  terminacion: number
+  fecha: string
+  fuente: string | null
+  verificado: boolean
+}
+
+export type EscalaMonotributo = {
+  id: string
+  categoria: string
+  vigente_desde: string
+  ingresos_max: number
+  cuota_servicios: number
+  cuota_bienes: number
+  fuente: string | null
+  verificado: boolean
+}
+
+export type Recategorizacion = {
+  ingresos_12m: number
+  tope_actual: number | null
+  uso_porcentaje: number | null
+  categoria_actual: string | null
+  categoria_sugerida: string | null
+  excede_k: boolean
+  meses_sin_comprobantes: string[] | null
+  sin_confirmar: number | null
+  escala_verificada: boolean
+  advertencias: string[] | null
+}
+
+export const OBLIGACION_LABEL: Record<string, string> = {
+  iva_ddjj: 'IVA – DDJJ y pago',
+  monotributo_cuota: 'Monotributo – cuota mensual',
+  f931: 'F.931 – cargas sociales',
+}

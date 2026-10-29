@@ -12,8 +12,11 @@ import Importar from './pantallas/Importar'
 import Tareas from './pantallas/Tareas'
 import Agenda from './pantallas/Agenda'
 import CertificadosArca from './pantallas/CertificadosArca'
+import Obligaciones from './pantallas/Obligaciones'
+import Recategorizacion from './pantallas/Recategorizacion'
+import Vencimientos from './pantallas/Vencimientos'
 
-type Vista = 'tablero' | 'importar' | 'tareas' | 'agenda' | 'certificados' | 'clientes' | 'usuarios' | 'roles' | 'auditoria' | 'estudios'
+type Vista = 'tablero' | 'importar' | 'tareas' | 'agenda' | 'obligaciones' | 'recategorizacion' | 'vencimientos' | 'certificados' | 'clientes' | 'usuarios' | 'roles' | 'auditoria' | 'estudios'
 
 export default function Panel({ session }: { session: Session }) {
   const yo = session.user.id
@@ -82,6 +85,8 @@ export default function Panel({ session }: { session: Session }) {
     solapas.push({ id: 'importar', nombre: 'Importar' })
     solapas.push({ id: 'tareas', nombre: 'Tareas' })
     solapas.push({ id: 'agenda', nombre: 'Agenda' })
+    solapas.push({ id: 'obligaciones', nombre: 'Obligaciones' })
+    solapas.push({ id: 'recategorizacion', nombre: 'Recategorización' })
   }
   if (estudio && gestiona) {
     solapas.push({ id: 'usuarios', nombre: 'Usuarios' })
@@ -89,6 +94,7 @@ export default function Panel({ session }: { session: Session }) {
     solapas.push({ id: 'certificados', nombre: 'Certificados ARCA' })
     solapas.push({ id: 'auditoria', nombre: 'Auditoría' })
   }
+  if (estudio && soyMiembro || esHolding) solapas.push({ id: 'vencimientos', nombre: 'Vencimientos' })
   if (esHolding) solapas.push({ id: 'estudios', nombre: 'Holding' })
   const actual: Vista | null = solapas.some((s) => s.id === vista) ? vista : (solapas[0]?.id ?? null)
 
@@ -144,6 +150,9 @@ export default function Panel({ session }: { session: Session }) {
       {actual === 'importar' && estudio && <Importar key={estudio.id} estudio={estudio} permisos={permisos} />}
       {actual === 'tareas' && estudio && <Tareas key={estudio.id} estudio={estudio} permisos={permisos} />}
       {actual === 'agenda' && estudio && <Agenda key={estudio.id} estudio={estudio} permisos={permisos} yo={yo} />}
+      {actual === 'obligaciones' && estudio && <Obligaciones key={estudio.id} estudio={estudio} permisos={permisos} />}
+      {actual === 'recategorizacion' && estudio && <Recategorizacion key={estudio.id} estudio={estudio} />}
+      {actual === 'vencimientos' && <Vencimientos esHolding={esHolding} />}
       {actual === 'clientes' && estudio && <Clientes key={estudio.id} estudio={estudio} permisos={permisos} />}
       {actual === 'usuarios' && estudio && <Usuarios key={estudio.id} estudio={estudio} yo={yo} />}
       {actual === 'roles' && estudio && <Roles key={estudio.id} estudio={estudio} />}
