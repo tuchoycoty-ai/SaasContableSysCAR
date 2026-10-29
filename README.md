@@ -99,7 +99,7 @@ npm run dev
 - La recategorización necesita los topes oficiales de monotributo (Fase 6).
 - Las operaciones son atómicas: si una falla a mitad de camino, sus escrituras parciales se revierten y se reintenta.
 
-## Fase 5 (en curso) — Certificados ARCA por estudio
+## Fase 5 — Integración con ARCA (certificados por estudio + padrón)
 
 - Pestaña **Certificados ARCA** (administrador del estudio y holding): subir un par `.crt` + `.key` existente, o **generar clave y pedido CSR** para un estudio nuevo y luego subir el `.crt` que entrega ARCA.
 - La **clave privada se guarda cifrada** (AES-GCM) en `arca_secretos`, que ni el navegador ni los usuarios pueden leer. Solo la Edge Function `arca-certificados` la maneja. No se puede descargar nunca.
@@ -115,3 +115,15 @@ npm run dev
 - Completa razón social, régimen y categoría de monotributo, y muestra domicilio fiscal e impuestos activos. Siempre se revisa antes de guardar.
 - **IVA vs. IVA EXENTO:** `padron.ts` clasifica el texto de la condición evaluando primero «exento», de modo que «IVA EXENTO» nunca se toma como inscripto. Si el texto es ambiguo o no se reconoce, el régimen queda vacío con una advertencia (no se asume nada).
 - Cada consulta queda en auditoría (`ARCA_PADRON`). Se reutiliza el ticket de ARCA guardado (tabla `arca_tickets`).
+
+### Cierre de la Fase 5 — qué está realmente implementado
+
+**Archivos:** migraciones `20261030000006` a `...0008` (tablas de certificados, claves cifradas y tickets); Edge Function `arca-certificados` (`index.ts`, `cripto.ts`, `padron.ts`); pantalla `CertificadosArca.tsx`; botón de consulta en `Clientes.tsx`; pruebas `supabase/tests/fase5.sql`.
+
+**Tablas:** `arca_certificados` (datos públicos del certificado, visibles solo para administradores del estudio y el holding), `arca_secretos` (clave privada cifrada; sin acceso desde el navegador) y `arca_tickets` (tickets de acceso de ARCA; sin acceso desde el navegador).
+
+**Real y verificado contra ARCA (producción):** carga/generación de certificados por estudio, login WSAA firmado, y consulta de CUIT en el padrón (`ws_sr_constancia_inscripcion`) con razón social, domicilio, régimen y categoría de monotributo; se probó con exento, monotributo, y no inscripto.
+
+**No implementado todavía:** importación automática de comprobantes desde ARCA (la tarea `arca.importar_comprobantes` sigue «pendiente de integración»; ARCA no ofrece un servicio público equivalente a «Mis Comprobantes») y facturación. Nada se simula.
+
+**Pruebas:** `fase5.sql` (15 comprobaciones: aislamiento entre estudios, permisos por rol, claves y tickets inaccesibles desde el navegador, restricciones, auditoría) y las unitarias de `padron.ts` (38 comprobaciones, incluido «IVA EXENTO»).
