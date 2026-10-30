@@ -12,13 +12,14 @@ import Importar from './pantallas/Importar'
 import Tareas from './pantallas/Tareas'
 import Agenda from './pantallas/Agenda'
 import CertificadosArca from './pantallas/CertificadosArca'
+import Ayuda from './pantallas/Ayuda'
 import Reportes from './pantallas/Reportes'
 import Carpetas from './pantallas/Carpetas'
 import Obligaciones from './pantallas/Obligaciones'
 import Recategorizacion from './pantallas/Recategorizacion'
 import Vencimientos from './pantallas/Vencimientos'
 
-type Vista = 'tablero' | 'reportes' | 'importar' | 'carpetas' | 'tareas' | 'agenda' | 'obligaciones' | 'recategorizacion' | 'vencimientos' | 'certificados' | 'clientes' | 'usuarios' | 'roles' | 'auditoria' | 'estudios'
+type Vista = 'tablero' | 'ayuda' | 'reportes' | 'importar' | 'carpetas' | 'tareas' | 'agenda' | 'obligaciones' | 'recategorizacion' | 'vencimientos' | 'certificados' | 'clientes' | 'usuarios' | 'roles' | 'auditoria' | 'estudios'
 
 export default function Panel({ session }: { session: Session }) {
   const yo = session.user.id
@@ -100,6 +101,7 @@ export default function Panel({ session }: { session: Session }) {
   }
   if (estudio && soyMiembro || esHolding) solapas.push({ id: 'vencimientos', nombre: 'Vencimientos' })
   if (esHolding) solapas.push({ id: 'estudios', nombre: 'Holding' })
+  if (solapas.length > 0) solapas.push({ id: 'ayuda', nombre: 'Ayuda' })
   const actual: Vista | null = solapas.some((s) => s.id === vista) ? vista : (solapas[0]?.id ?? null)
 
   return (
@@ -152,6 +154,7 @@ export default function Panel({ session }: { session: Session }) {
 
       {actual === 'tablero' && estudio && <Tablero key={estudio.id} estudio={estudio} />}
       {actual === 'importar' && estudio && <Importar key={estudio.id} estudio={estudio} permisos={permisos} />}
+      {actual === 'ayuda' && <Ayuda />}
       {actual === 'reportes' && estudio && <Reportes key={estudio.id} estudio={estudio} />}
       {actual === 'carpetas' && estudio && <Carpetas key={estudio.id} estudio={estudio} permisos={permisos} yo={yo} />}
       {actual === 'tareas' && estudio && <Tareas key={estudio.id} estudio={estudio} permisos={permisos} />}

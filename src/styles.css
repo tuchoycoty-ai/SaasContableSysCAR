@@ -100,3 +100,8 @@ summary { cursor: pointer; margin: 8px 0; }
   .solapas, .barra button, button, label select, .fila.tres { display: none !important; }
   main.tarjeta { box-shadow: none; max-width: none; }
 }
+
+details { border: 1px solid var(--borde, #d9dee3); border-radius: 8px; padding: 0.6rem 0.9rem; margin: 0.5rem 0; }
+details > summary { cursor: pointer; }
+details ol, details ul { padding-left: 1.3rem; }
+details li { margin: 0.3rem 0; }

@@ -169,3 +169,6 @@ npm run dev
 **Regresión completa:** `aislamiento.sql` (30), `fase2.sql` (28), `fase3.sql` (32 grupos), `fase4.sql` (84), `fase5.sql` (15), `fase6.sql` (47) y `fase7.sql` (20) pasan. En la regresión se encontró un desfasaje: el rol «Contador» de los estudios nuevos no recibía el permiso de obligaciones; se corrigió (migración `...0012`) y se actualizó la prueba de la Fase 2.
 
 **Pendiente de verificación humana:** el calendario de vencimientos y la escala de monotributo cargados desde fuentes de terceros (solapa Vencimientos), la protección de contraseñas filtradas y una prueba completa de punta a punta en la aplicación.
+
+### Módulo de Ayuda (agregado a pedido)
+Solapa «Ayuda» visible para todos los usuarios (`src/pantallas/Ayuda.tsx`): manual de usuario paso a paso de cada solapa (ingreso, Tablero, Clientes, Importar, Carpetas ARCA, Tareas, Agenda, Obligaciones, Recategorización, Reportes, Usuarios, Roles, Certificados ARCA, Auditoría, Vencimientos y Holding), con buscador, glosario de estados, problemas frecuentes y guía de soporte. Si se agrega o cambia una función, hay que actualizar este manual.
