@@ -161,3 +161,11 @@ npm run dev
 **Reportes y análisis financiero (solapa «Reportes»):** por cliente o para toda la cartera, en el rango de meses que elijas. Muestra ventas y compras netas, resultado estimado y margen, variación mensual de ventas, posición de IVA, impuestos pagados y carga tributaria sobre ventas, mejores y peores meses, principales clientes y proveedores con su porcentaje (con aviso si uno concentra más de la mitad) y la cantidad de comprobantes sin confirmar. Se puede descargar en CSV o imprimir/guardar como PDF. Son estimaciones sobre los comprobantes importados: el «resultado» no es un balance y la posición de IVA no es una liquidación.
 - Base: `top_contrapartes` y `resumen_cartera` (migración `20261030000011`), consultas de solo lectura que respetan los permisos de quien consulta. Pruebas: `supabase/tests/fase7.sql` (20 comprobaciones: aislamiento entre estudios, clientes asignados, notas de crédito, límites y acceso anónimo denegado).
 - El acuse de DJ de IVA (F.2002) ahora se asocia a la obligación `iva_ddjj` como «presentada».
+
+### Cierre de la Fase 7 — verificación final
+
+**Seguridad (auditoría de la base):** las 26 tablas tienen RLS; el rol anónimo no tiene permisos sobre ninguna tabla ni función; no hay funciones privilegiadas sin `search_path` fijo; las claves y tickets de ARCA no son accesibles desde el navegador (ni para el holding). Único aviso pendiente del asesor de Supabase: «protección de contraseñas filtradas», que se activa en el panel de Supabase (Authentication → Providers → Email; puede requerir un plan pago).
+
+**Regresión completa:** `aislamiento.sql` (30), `fase2.sql` (28), `fase3.sql` (32 grupos), `fase4.sql` (84), `fase5.sql` (15), `fase6.sql` (47) y `fase7.sql` (20) pasan. En la regresión se encontró un desfasaje: el rol «Contador» de los estudios nuevos no recibía el permiso de obligaciones; se corrigió (migración `...0012`) y se actualizó la prueba de la Fase 2.
+
+**Pendiente de verificación humana:** el calendario de vencimientos y la escala de monotributo cargados desde fuentes de terceros (solapa Vencimientos), la protección de contraseñas filtradas y una prueba completa de punta a punta en la aplicación.

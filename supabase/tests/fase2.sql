@@ -35,7 +35,10 @@ begin
   if n <> 1 then raise exception 'FALLO 2: el estudio nuevo no tiene exactamente un rol administrador'; end if;
   select count(*) into n from public.role_permissions rp join public.roles r on r.id = rp.role_id
     where r.tenant_id = v_nuevo and r.nombre = 'Contador';
-  if n <> 1 then raise exception 'FALLO 3: el rol Contador no recibio su permiso'; end if;
+  if n <> 4 then raise exception 'FALLO 3: el rol Contador tiene % permisos (esperaba 4)', n; end if;
+  select count(*) into n from public.role_permissions rp join public.roles r on r.id = rp.role_id
+    where r.tenant_id = v_nuevo and r.nombre <> 'Contador';
+  if n <> 0 then raise exception 'FALLO 3b: otros roles recibieron permisos por defecto'; end if;
   begin
     perform public.crear_estudio('Estudio con CUIT malo', '20999999990');
     raise exception 'FALLO 4: se creo un estudio con CUIT invalido';
