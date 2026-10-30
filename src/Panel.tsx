@@ -12,12 +12,13 @@ import Importar from './pantallas/Importar'
 import Tareas from './pantallas/Tareas'
 import Agenda from './pantallas/Agenda'
 import CertificadosArca from './pantallas/CertificadosArca'
+import Reportes from './pantallas/Reportes'
 import Carpetas from './pantallas/Carpetas'
 import Obligaciones from './pantallas/Obligaciones'
 import Recategorizacion from './pantallas/Recategorizacion'
 import Vencimientos from './pantallas/Vencimientos'
 
-type Vista = 'tablero' | 'importar' | 'carpetas' | 'tareas' | 'agenda' | 'obligaciones' | 'recategorizacion' | 'vencimientos' | 'certificados' | 'clientes' | 'usuarios' | 'roles' | 'auditoria' | 'estudios'
+type Vista = 'tablero' | 'reportes' | 'importar' | 'carpetas' | 'tareas' | 'agenda' | 'obligaciones' | 'recategorizacion' | 'vencimientos' | 'certificados' | 'clientes' | 'usuarios' | 'roles' | 'auditoria' | 'estudios'
 
 export default function Panel({ session }: { session: Session }) {
   const yo = session.user.id
@@ -89,6 +90,7 @@ export default function Panel({ session }: { session: Session }) {
     solapas.push({ id: 'agenda', nombre: 'Agenda' })
     solapas.push({ id: 'obligaciones', nombre: 'Obligaciones' })
     solapas.push({ id: 'recategorizacion', nombre: 'Recategorización' })
+    solapas.push({ id: 'reportes', nombre: 'Reportes' })
   }
   if (estudio && gestiona) {
     solapas.push({ id: 'usuarios', nombre: 'Usuarios' })
@@ -150,6 +152,7 @@ export default function Panel({ session }: { session: Session }) {
 
       {actual === 'tablero' && estudio && <Tablero key={estudio.id} estudio={estudio} />}
       {actual === 'importar' && estudio && <Importar key={estudio.id} estudio={estudio} permisos={permisos} />}
+      {actual === 'reportes' && estudio && <Reportes key={estudio.id} estudio={estudio} />}
       {actual === 'carpetas' && estudio && <Carpetas key={estudio.id} estudio={estudio} permisos={permisos} yo={yo} />}
       {actual === 'tareas' && estudio && <Tareas key={estudio.id} estudio={estudio} permisos={permisos} />}
       {actual === 'agenda' && estudio && <Agenda key={estudio.id} estudio={estudio} permisos={permisos} yo={yo} />}

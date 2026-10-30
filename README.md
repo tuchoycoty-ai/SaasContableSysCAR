@@ -157,3 +157,7 @@ npm run dev
 - Corrección en el importador de recibidos: ahora la contraparte es el CUIT del **emisor** (antes podía tomar el del receptor, que es el propio cliente).
 
 **Pruebas:** `pruebas/importar.test.ts` (9 grupos) y `pruebas/pdf.test.ts` (5 grupos); además se contrastaron contra archivos reales de ARCA (totales de CSV iguales a la suma independiente; 6 PDF leídos correctamente).
+
+**Reportes y análisis financiero (solapa «Reportes»):** por cliente o para toda la cartera, en el rango de meses que elijas. Muestra ventas y compras netas, resultado estimado y margen, variación mensual de ventas, posición de IVA, impuestos pagados y carga tributaria sobre ventas, mejores y peores meses, principales clientes y proveedores con su porcentaje (con aviso si uno concentra más de la mitad) y la cantidad de comprobantes sin confirmar. Se puede descargar en CSV o imprimir/guardar como PDF. Son estimaciones sobre los comprobantes importados: el «resultado» no es un balance y la posición de IVA no es una liquidación.
+- Base: `top_contrapartes` y `resumen_cartera` (migración `20261030000011`), consultas de solo lectura que respetan los permisos de quien consulta. Pruebas: `supabase/tests/fase7.sql` (20 comprobaciones: aislamiento entre estudios, clientes asignados, notas de crédito, límites y acceso anónimo denegado).
+- El acuse de DJ de IVA (F.2002) ahora se asocia a la obligación `iva_ddjj` como «presentada».

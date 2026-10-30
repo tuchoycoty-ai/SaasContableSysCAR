@@ -95,3 +95,8 @@ code { background: var(--fondo); padding: 1px 5px; border-radius: 4px; }
 .punto.egreso { background: var(--serie2); }
 summary { cursor: pointer; margin: 8px 0; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+@media print {
+  .solapas, .barra button, button, label select, .fila.tres { display: none !important; }
+  main.tarjeta { box-shadow: none; max-width: none; }
+}

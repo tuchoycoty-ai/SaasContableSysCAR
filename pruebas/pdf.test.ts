@@ -34,6 +34,11 @@ prueba('DJ F.931: presentada; F.2083: no se asocia', () => {
   assert.ok(l.ok)
   if (l.ok) { const p = planDe(l.doc); assert.equal(p.obligacion, null); assert.equal(p.pago, null); assert.equal(p.avisos.length, 1) }
 })
+prueba('DJ de IVA (F.2002): presentada', () => {
+  const r = interpretarPdf(DJ931.map((x) => x.replace('931 v4700 - EMPLEADOR DJ', '2002 v250 - IVA POR ACTIVIDAD')))
+  assert.ok(r.ok)
+  if (r.ok) { const p = planDe(r.doc); assert.deepEqual([p.obligacion?.codigo, p.obligacion?.periodo, p.obligacion?.estado], ['iva_ddjj', '2026-04', 'presentada']) }
+})
 prueba('rechaza lo que no entiende', () => {
   assert.equal(interpretarPdf(['Hola mundo']).ok, false)
   assert.equal(interpretarPdf(VEP_SICOSS.map((x) => x.replace('20-11111111-2', '20-11111111-9'))).ok, false) // CUIT invalido

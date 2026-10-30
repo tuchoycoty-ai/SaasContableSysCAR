@@ -131,6 +131,9 @@ export function planDe(doc: Vep | AcuseDj): Plan {
   if (doc.formulario === '931' && doc.periodo) {
     return { pago: null, obligacion: { codigo: 'f931', periodo: doc.periodo, estado: 'presentada', fecha: doc.fechaPresentacion, nota: `DJ F.931 transacción ${doc.nroTransaccion}` }, avisos: [] }
   }
+  if (doc.formulario === '2002' && doc.periodo) {
+    return { pago: null, obligacion: { codigo: 'iva_ddjj', periodo: doc.periodo, estado: 'presentada', fecha: doc.fechaPresentacion, nota: `DJ IVA F.2002 transacción ${doc.nroTransaccion}` }, avisos: [] }
+  }
   return {
     pago: null,
     obligacion: null,
