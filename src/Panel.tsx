@@ -12,11 +12,12 @@ import Importar from './pantallas/Importar'
 import Tareas from './pantallas/Tareas'
 import Agenda from './pantallas/Agenda'
 import CertificadosArca from './pantallas/CertificadosArca'
+import Carpetas from './pantallas/Carpetas'
 import Obligaciones from './pantallas/Obligaciones'
 import Recategorizacion from './pantallas/Recategorizacion'
 import Vencimientos from './pantallas/Vencimientos'
 
-type Vista = 'tablero' | 'importar' | 'tareas' | 'agenda' | 'obligaciones' | 'recategorizacion' | 'vencimientos' | 'certificados' | 'clientes' | 'usuarios' | 'roles' | 'auditoria' | 'estudios'
+type Vista = 'tablero' | 'importar' | 'carpetas' | 'tareas' | 'agenda' | 'obligaciones' | 'recategorizacion' | 'vencimientos' | 'certificados' | 'clientes' | 'usuarios' | 'roles' | 'auditoria' | 'estudios'
 
 export default function Panel({ session }: { session: Session }) {
   const yo = session.user.id
@@ -83,6 +84,7 @@ export default function Panel({ session }: { session: Session }) {
     solapas.push({ id: 'tablero', nombre: 'Tablero' })
     solapas.push({ id: 'clientes', nombre: 'Clientes' })
     solapas.push({ id: 'importar', nombre: 'Importar' })
+    solapas.push({ id: 'carpetas', nombre: 'Carpetas ARCA' })
     solapas.push({ id: 'tareas', nombre: 'Tareas' })
     solapas.push({ id: 'agenda', nombre: 'Agenda' })
     solapas.push({ id: 'obligaciones', nombre: 'Obligaciones' })
@@ -148,6 +150,7 @@ export default function Panel({ session }: { session: Session }) {
 
       {actual === 'tablero' && estudio && <Tablero key={estudio.id} estudio={estudio} />}
       {actual === 'importar' && estudio && <Importar key={estudio.id} estudio={estudio} permisos={permisos} />}
+      {actual === 'carpetas' && estudio && <Carpetas key={estudio.id} estudio={estudio} permisos={permisos} yo={yo} />}
       {actual === 'tareas' && estudio && <Tareas key={estudio.id} estudio={estudio} permisos={permisos} />}
       {actual === 'agenda' && estudio && <Agenda key={estudio.id} estudio={estudio} permisos={permisos} yo={yo} />}
       {actual === 'obligaciones' && estudio && <Obligaciones key={estudio.id} estudio={estudio} permisos={permisos} />}

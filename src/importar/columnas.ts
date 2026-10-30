@@ -41,8 +41,21 @@ const PAGOS: Campo[] = [
   { id: 'referencia', etiqueta: 'Referencia (VEP, comprobante)', obligatorio: false, alias: ['referencia', 'nrovep', 'vep', 'nrooperacion', 'comprobante'] },
 ]
 
+// En los archivos de ARCA «recibidos» existen las dos columnas (emisor y receptor); la contraparte es el EMISOR
+// (el receptor es el propio cliente). En «emitidos» solo existe el receptor.
+const ALIAS_RECIBIDOS: Record<string, string[]> = {
+  doc: ['nrodocemisor', 'nrodocumento', 'nrodoc', 'cuitcontraparte', 'cuit', 'documento', 'nrodocreceptor'],
+  contraparte: ['denominacionemisor', 'denominacion', 'razonsocial', 'contraparte', 'denominacionreceptor'],
+}
+const ALIAS_EMITIDOS: Record<string, string[]> = {
+  doc: ['nrodocreceptor', 'nrodocumento', 'nrodoc', 'cuitcontraparte', 'cuit', 'documento'],
+  contraparte: ['denominacionreceptor', 'denominacion', 'razonsocial', 'contraparte'],
+}
+
 export function camposDe(tipo: TipoImportacion): Campo[] {
-  return tipo === 'pagos' ? PAGOS : COMUNES
+  if (tipo === 'pagos') return PAGOS
+  const alias = tipo === 'comprobantes_recibidos' ? ALIAS_RECIBIDOS : ALIAS_EMITIDOS
+  return COMUNES.map((c) => (alias[c.id] ? { ...c, alias: alias[c.id] } : c))
 }
 
 // Busca la fila de encabezados: la primera (entre las 30 primeras) que reconoce al menos 3 campos.

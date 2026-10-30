@@ -7,10 +7,12 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test:importar": "tsx pruebas/importar.test.ts"
+    "test:importar": "tsx pruebas/importar.test.ts",
+    "test:pdf": "tsx pruebas/pdf.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
+    "pdfjs-dist": "^4.10.38",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "read-excel-file": "^5.8.5"

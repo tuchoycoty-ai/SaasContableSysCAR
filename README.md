@@ -147,3 +147,13 @@ npm run dev
 **A verificar por el holding:** el calendario de noviembre 2026 y la escala de monotributo vigente desde 2026-08-01 se cargaron desde sitios de terceros y quedan «Sin verificar» hasta que se confirmen contra ARCA en la pantalla Vencimientos.
 
 **Pruebas:** `fase6.sql` (47 comprobaciones) y la regresión completa de `fase4.sql` (84 comprobaciones) pasaron.
+
+
+## Fase 7 (en curso) — Carpetas de ARCA y lectura de comprobantes
+
+**Carpetas ARCA:** solapa donde se elige una carpeta por acción (comprobantes emitidos, recibidos, DDJJ y VEP). Mientras la pantalla está abierta, SysCAR revisa las carpetas cada minuto, lee los archivos nuevos **en el navegador** (no se suben) y los muestra para confirmar. Requiere Chrome o Edge de escritorio. Nada se importa sin confirmación.
+- CSV/Excel de «Mis Comprobantes»: el cliente se identifica por el CUIT que figura en el nombre del archivo y se importa con las mismas reglas del importador (duplicados, notas de crédito en negativo, validaciones).
+- PDF de ARCA (`src/importar/pdf.ts`): *comprobante de pago de VEP* y *acuse de recibo de DJ*. Todo VEP pagado se registra como pago. Se asocia a una obligación solo lo verificado con comprobantes reales: acuse del F.931 (→ presentada) y VEP de SICOSS «SIJPDJ» (→ pagada). El resto (VEP consolidado, honorarios, Libro IVA Digital F.2083) se reconoce pero no toca obligaciones.
+- Corrección en el importador de recibidos: ahora la contraparte es el CUIT del **emisor** (antes podía tomar el del receptor, que es el propio cliente).
+
+**Pruebas:** `pruebas/importar.test.ts` (9 grupos) y `pruebas/pdf.test.ts` (5 grupos); además se contrastaron contra archivos reales de ARCA (totales de CSV iguales a la suma independiente; 6 PDF leídos correctamente).
