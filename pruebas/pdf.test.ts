@@ -26,6 +26,14 @@ prueba('VEP consolidado y honorarios: solo pago, sin obligacion', () => {
   assert.ok(r.ok && r.doc.tipo === 'vep' && r.doc.consolidado)
   if (r.ok) { const p = planDe(r.doc); assert.equal(p.obligacion, null); assert.equal(p.pago?.importe, 1999857.06); assert.equal(p.avisos.length, 1) }
 })
+prueba('subVEP (anticipo de Ganancias): se lee como pago y avisa del consolidado', () => {
+  const r = interpretarPdf(['VEP', 'Comprobante de Pago', 'Datos del subVEP:', 'Nro. subVEP: 1688518472', 'Tipo de Pago: ARCA - OTROS PAGOS', 'Descripción Reducida: ARCA2026', 'CUIT: 20-11111111-2', 'Período: 2026',
+    'Corresponde al VEP Consolidado: 1688518470', 'Medio de Pago: HomeBanking-EFECTIVO', 'Nro. de Transacción: 2254889066', 'Fecha de Pago: 2026-10-05 Hora: 13:57:39', 'IMPORTE PAGADO $2.993.570,12'])
+  assert.ok(r.ok && r.doc.tipo === 'vep')
+  if (!r.ok || r.doc.tipo !== 'vep') return
+  assert.equal(r.doc.nroVep, '1688518472'); assert.equal(r.doc.subDe, '1688518470'); assert.equal(r.doc.periodo, null); assert.equal(r.doc.importe, 2993570.12)
+  const p = planDe(r.doc); assert.equal(p.obligacion, null); assert.equal(p.pago?.referencia, '1688518472'); assert.equal(p.avisos.length, 2)
+})
 prueba('DJ F.931: presentada; F.2083: no se asocia', () => {
   const r = interpretarPdf(DJ931)
   assert.ok(r.ok && r.doc.tipo === 'dj')

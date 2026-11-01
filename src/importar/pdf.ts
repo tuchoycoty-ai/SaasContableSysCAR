@@ -36,6 +36,7 @@ export type Vep = {
   fechaPago: string // AAAA-MM-DD
   medio: string | null
   nroTransaccion: string | null
+  subDe: string | null // si es un subVEP: número del VEP Consolidado al que pertenece
 }
 export type AcuseDj = {
   tipo: 'dj'
@@ -68,7 +69,7 @@ const periodoIso = (t: string | null): string | null => (t && /^\d{4}-(0[1-9]|1[
 export function interpretarPdf(lineas: string[]): LecturaPdf {
   const txt = lineas.join('\n')
   const esDj = /Acuse de recibo de DJ/i.test(txt)
-  const esVep = !esDj && /Comprobante de Pago/i.test(txt) && /Nro\. VEP/i.test(txt)
+  const esVep = !esDj && /Comprobante de Pago/i.test(txt) && /Nro\. (sub)?VEP/i.test(txt)
   if (!esDj && !esVep) return { ok: false, error: 'No parece un comprobante de pago de VEP ni un acuse de DJ de ARCA.' }
 
   const cuit = (valor(lineas, 'CUIT:') ?? '').replace(/\D/g, '')
@@ -84,7 +85,7 @@ export function interpretarPdf(lineas: string[]): LecturaPdf {
   }
 
   const consolidado = valor(lineas, 'Nro. VEP Consolidado:') !== null
-  const nro = (valor(lineas, 'Nro. VEP Consolidado:') ?? valor(lineas, 'Nro. VEP:') ?? '').replace(/\D/g, '')
+  const nro = (valor(lineas, 'Nro. VEP Consolidado:') ?? valor(lineas, 'Nro. VEP:') ?? valor(lineas, 'Nro. subVEP:') ?? '').replace(/\D/g, '')
   const pagado = lineas.find((l) => /^IMPORTE PAGADO/i.test(l))
   if (!pagado) return { ok: false, error: 'El VEP no muestra un importe pagado: solo se leen comprobantes de pagos efectuados.' }
   const importe = parseNumero(pagado.replace(/^IMPORTE PAGADO/i, ''))
@@ -95,6 +96,7 @@ export function interpretarPdf(lineas: string[]): LecturaPdf {
     doc: {
       tipo: 'vep', cuit, nroVep: nro, consolidado, tipoPago: valor(lineas, 'Tipo de Pago:') ?? 'VEP', descripcion: valor(lineas, 'Descripción Reducida:'),
       periodo: periodoIso(valor(lineas, 'Período:')), importe: Math.round(importe * 100) / 100, fechaPago: fecha,
+      subDe: valor(lineas, 'Corresponde al VEP Consolidado:')?.replace(/\D/g, '') || null,
       medio: valor(lineas, 'Medio de Pago:'), nroTransaccion: valor(lineas, 'Nro. de Transacción:')?.replace(/\D/g, '') ?? null,
     },
   }
@@ -126,7 +128,7 @@ export function planDe(doc: Vep | AcuseDj): Plan {
         avisos: [],
       }
     }
-    return { pago, obligacion: null, avisos: ['Se registra como pago; este tipo de VEP todavía no se asocia a una obligación del cliente.'] }
+    return { pago, obligacion: null, avisos: ['Se registra como pago; este tipo de VEP todavía no se asocia a una obligación del cliente.', ...(doc.subDe ? [`Es un subVEP del VEP Consolidado ${doc.subDe}: si también cargás ese consolidado, el pago se contaría dos veces.`] : [])] }
   }
   if (doc.formulario === '931' && doc.periodo) {
     return { pago: null, obligacion: { codigo: 'f931', periodo: doc.periodo, estado: 'presentada', fecha: doc.fechaPresentacion, nota: `DJ F.931 transacción ${doc.nroTransaccion}` }, avisos: [] }
