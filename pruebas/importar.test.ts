@@ -157,4 +157,19 @@ prueba('recibidos reales: factura C sin desglose y neto solo en la columna IVA 0
   assert.equal(r.validas[2].iva, 4364.88)
 })
 
+prueba('Excel «Mis Comprobantes» (título arriba, columnas «Neto Gravado Total» / «Op. Exentas»)', () => {
+  const filas: unknown[][] = [
+    ['Mis Comprobantes Recibidos - CUIT 20111111112', null, null],
+    ['Fecha', 'Tipo', 'Punto de Venta', 'Número Desde', 'Tipo Doc. Emisor', 'Nro. Doc. Emisor', 'Denominación Emisor', 'Moneda', 'Neto Grav. IVA 21%', 'IVA 21%', 'Neto Gravado Total', 'Neto No Gravado', 'Op. Exentas', 'Otros Tributos', 'Total IVA', 'Imp. Total'],
+    ['01/10/2026', '1 - Factura A', 16, 10216, 'CUIT', 30712154019, 'PROVEEDOR SRL', '$', 240504.51, 50505.95, 240504.51, 0, 0, 21738.25, 50505.95, 312748.71],
+  ]
+  const enc = encontrarEncabezado(filas, 'comprobantes_recibidos')
+  assert.equal(enc, 1)
+  const mapa = detectarColumnas(filas[enc], 'comprobantes_recibidos')
+  assert.ok(mapa.neto_gravado >= 0 && mapa.exento >= 0 && mapa.doc === 5)
+  const r = validarFilas('comprobantes_recibidos', filas.slice(2), mapa, 3, '2026-11-02', [8])
+  assert.equal(r.rechazos.length, 0)
+  assert.deepEqual([r.validas[0].neto_gravado, r.validas[0].iva, r.validas[0].total, r.validas[0].doc, r.validas[0].tipo_cbte], [240504.51, 50505.95, 312748.71, '30712154019', 1])
+})
+
 console.log(`\n${n} grupos de pruebas OK`)
