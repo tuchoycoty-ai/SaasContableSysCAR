@@ -209,6 +209,11 @@ export default function Carpetas({ estudio, permisos, yo }: { estudio: Estudio; 
         Elegí una carpeta por acción y guardá ahí lo que bajás de ARCA. SysCAR revisa las carpetas cada minuto <strong>mientras esta pantalla esté abierta</strong> y te muestra lo nuevo para que lo confirmes.
         Los archivos se leen en tu navegador y no se suben: solo se guardan los datos que confirmes.
       </p>
+      <div className="aviso">
+        <strong>¿Querés que los comprobantes se bajen solos?</strong> Instalá la extensión de SysCAR en Chrome o Edge: con tu sesión de ARCA recorre todos tus clientes y deja los Excel de emitidos y recibidos en Descargas. Paso a paso en la solapa <strong>Ayuda</strong> («Bajar comprobantes de ARCA automáticamente»).{' '}
+        <a href="/descargas/syscar-descargador.zip" download>Descargar extensión</a>{' · '}
+        <a href="https://auth.afip.gob.ar/contribuyente_/login.xhtml" target="_blank" rel="noopener noreferrer">Abrir ARCA (ingreso con Clave Fiscal)</a>
+      </div>
       {!soportado && <p className="error" role="alert">Tu navegador no permite elegir carpetas. Usá Chrome o Edge de escritorio, o importá a mano desde «Importar».</p>}
       {error && <p className="error" role="alert">{error}</p>}
       {soportado && (

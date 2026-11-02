@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test:importar": "tsx pruebas/importar.test.ts",
-    "test:pdf": "tsx pruebas/pdf.test.ts"
+    "test:pdf": "tsx pruebas/pdf.test.ts",
+    "empaquetar:extension": "cd extension-descargador && zip -qr ../public/descargas/syscar-descargador.zip . -x 'pruebas/*'"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
