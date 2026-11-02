@@ -172,3 +172,6 @@ npm run dev
 
 ### Módulo de Ayuda (agregado a pedido)
 Solapa «Ayuda» visible para todos los usuarios (`src/pantallas/Ayuda.tsx`): manual de usuario paso a paso de cada solapa (ingreso, Tablero, Clientes, Importar, Carpetas ARCA, Tareas, Agenda, Obligaciones, Recategorización, Reportes, Usuarios, Roles, Certificados ARCA, Auditoría, Vencimientos y Holding), con buscador, glosario de estados, problemas frecuentes y guía de soporte. Si se agrega o cambia una función, hay que actualizar este manual.
+
+## Extensión «Descargador de Mis Comprobantes»
+Carpeta `extension-descargador/`: extensión de Chrome/Edge que baja en Excel los comprobantes emitidos y recibidos de los clientes administrados desde «Mis Comprobantes» (con la sesión del propio contador; no toca la Clave Fiscal) y los deja en `Descargas/SysCAR/Emitidos|Recibidos`, que SysCAR vigila desde «Carpetas ARCA». Ver `extension-descargador/README.md`.

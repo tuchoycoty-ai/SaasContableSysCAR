@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><title>SysCAR – Mis Comprobantes</title><link rel="stylesheet" href="popup.css"></head>
+<body>
+<h1>SysCAR · Mis Comprobantes</h1>
+<p class="chico">Con tu sesión de ARCA ya iniciada, baja en Excel los comprobantes de tus clientes. La extensión no guarda ni usa tu Clave Fiscal.</p>
+
+<section><h2>1. Clientes</h2>
+  <button id="leer">Leer mis clientes de ARCA</button>
+  <div id="lista" class="lista"></div>
+  <p id="vacio" class="chico">Todavía no leíste tus clientes. Abrí «Mis Comprobantes» en esta pestaña y tocá el botón.</p>
+</section>
+
+<section><h2>2. Período</h2>
+  <label><input type="radio" name="modo" value="anterior" checked> Mes anterior</label>
+  <label><input type="radio" name="modo" value="elegir"> Elegir meses</label>
+  <div id="meses" class="fila oculto">
+    <label>Desde <input type="month" id="desde"></label>
+    <label>Hasta <input type="month" id="hasta"></label>
+  </div>
+  <label id="porMesFila" class="oculto"><input type="checkbox" id="porMes" checked> Un archivo por cada mes</label>
+</section>
+
+<section><h2>3. Qué bajar</h2>
+  <label><input type="checkbox" id="tEmitidos" checked> Emitidos</label>
+  <label><input type="checkbox" id="tRecibidos" checked> Recibidos</label>
+</section>
+
+<div class="fila">
+  <button id="iniciar" class="primario">Descargar</button>
+  <button id="continuar" class="oculto primario">Continuar</button>
+  <button id="detener" class="oculto">Detener</button>
+  <button id="limpiar" class="oculto">Limpiar</button>
+</div>
+<p id="mensaje" class="mensaje"></p>
+<div id="resultados"></div>
+<p class="chico">Los archivos quedan en <b>Descargas/SysCAR/Emitidos</b> y <b>Descargas/SysCAR/Recibidos</b>. Elegí esas carpetas en SysCAR → Carpetas ARCA.</p>
+<script type="module" src="popup.js"></script>
+</body></html>
