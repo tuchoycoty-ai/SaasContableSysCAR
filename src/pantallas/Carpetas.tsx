@@ -16,9 +16,9 @@ const SLOTS: { id: Slot; titulo: string; ayuda: string; ext: string[] }[] = [
   { id: 'ddjj_vep', titulo: 'DDJJ y VEP', ayuda: 'PDF de acuses de DJ y comprobantes de pago de VEP.', ext: ['pdf'] },
 ]
 
-type Dir = { entries(): AsyncIterable<[string, Entrada]>; name: string; queryPermission(o: { mode: 'read' }): Promise<string>; requestPermission(o: { mode: 'read' }): Promise<string> }
+type Dir = { entries(): AsyncIterable<[string, Entrada]>; name: string; isSameEntry(otro: Dir): Promise<boolean>; queryPermission(o: { mode: 'read' }): Promise<string>; requestPermission(o: { mode: 'read' }): Promise<string> }
 type Entrada = { kind: 'file' | 'directory'; getFile(): Promise<File> }
-type Win = { showDirectoryPicker?: (o: { mode: 'read' }) => Promise<Dir> }
+type Win = { showDirectoryPicker?: (o: { mode: 'read'; id?: string }) => Promise<Dir> }
 
 // ---- IndexedDB: guarda la carpeta elegida (el navegador no permite guardarla de otra forma) ----
 function abrirDb(): Promise<IDBDatabase> {
@@ -61,6 +61,8 @@ export default function Carpetas({ estudio, permisos, yo }: { estudio: Estudio; 
   const [buscando, setBuscando] = useState(false)
   const [ultima, setUltima] = useState<Date | null>(null)
   const vistos = useRef<Map<string, Item>>(new Map())
+  const dirsRef = useRef<Partial<Record<Slot, Dir>>>({}) // siempre las carpetas más nuevas (el reloj de 60 s no debe usar una copia vieja)
+  useEffect(() => { dirsRef.current = dirs }, [dirs])
   const claveProc = `syscar:procesados:${estudio.id}`
 
   const procesados = useCallback((): Set<string> => {
@@ -125,27 +127,42 @@ export default function Carpetas({ estudio, permisos, yo }: { estudio: Estudio; 
       for (const s of SLOTS) { const d = await leerDir(`${estudio.id}:${s.id}`); if (d) nuevo[s.id] = d }
       if (!vivo) return
       setDirs(nuevo)
+      dirsRef.current = nuevo
+      const repetida = await accionesRepetidas(nuevo)
+      if (repetida && vivo) setError(repetida)
       await buscar(nuevo)
-      reloj = window.setInterval(() => { buscar(nuevo).catch(() => undefined) }, 60000)
+      reloj = window.setInterval(() => { buscar(dirsRef.current).catch(() => undefined) }, 60000)
     })().catch(() => setError('No se pudieron recuperar las carpetas guardadas.'))
     return () => { vivo = false; if (reloj) window.clearInterval(reloj) }
   }, [soportado, estudio.id, clientes.length, buscar])
 
+  // Si dos acciones quedaron con la misma carpeta, se avisa (cada acción necesita la suya).
+  async function accionesRepetidas(actuales: Partial<Record<Slot, Dir>>): Promise<string | null> {
+    for (let i = 0; i < SLOTS.length; i++) for (let j = i + 1; j < SLOTS.length; j++) {
+      const a = actuales[SLOTS[i].id], b = actuales[SLOTS[j].id]
+      if (a && b && (await a.isSameEntry(b))) return `«${SLOTS[i].titulo}» y «${SLOTS[j].titulo}» están apuntando a la misma carpeta (${a.name}). Elegí una carpeta distinta para cada acción.`
+    }
+    return null
+  }
   async function elegir(slot: Slot) {
     setError(null)
     try {
-      const d = await (window as unknown as Win).showDirectoryPicker!({ mode: 'read' })
+      // «id»: Chrome recuerda por separado la última carpeta de cada acción y abre el selector ahí.
+      const d = await (window as unknown as Win).showDirectoryPicker!({ mode: 'read', id: `syscar-${slot}` })
+      const nuevo = { ...dirsRef.current, [slot]: d }
+      const repetida = await accionesRepetidas(nuevo)
+      if (repetida) { setError(repetida); return }
       await guardarDir(`${estudio.id}:${slot}`, d)
-      const nuevo = { ...dirs, [slot]: d }
       setDirs(nuevo)
+      dirsRef.current = nuevo
       await buscar(nuevo)
     } catch (e) {
       if (!(e instanceof DOMException && e.name === 'AbortError')) setError('No se pudo abrir la carpeta.')
     }
   }
   async function reactivar() {
-    for (const s of sinPermiso) await dirs[s]?.requestPermission({ mode: 'read' })
-    await buscar(dirs)
+    for (const s of sinPermiso) await dirsRef.current[s]?.requestPermission({ mode: 'read' })
+    await buscar(dirsRef.current)
   }
 
   async function confirmar(it: Item) {
