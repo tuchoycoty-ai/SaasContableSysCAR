@@ -99,3 +99,19 @@ export function plantillaCsv(tipo: TipoImportacion): string {
     '',
   ].join('\r\n')
 }
+
+// Columnas de ARCA con el desglose por alícuota: «Imp. Neto Gravado IVA 21%» / «Neto Grav. IVA 21%» y «IVA 21%».
+// Devuelven campo -> indice de columna (neto_21, iva_21, neto_10_5, ..., neto_0).
+export const ALICUOTAS = ['2_5', '5', '10_5', '21', '27'] as const
+const DIGITOS: Record<string, string> = { '0': '0', '25': '2_5', '5': '5', '105': '10_5', '21': '21', '27': '27' }
+export function columnasPorAlicuota(encabezado: unknown[]): Record<string, number> {
+  const mapa: Record<string, number> = {}
+  encabezado.forEach((h, i) => {
+    const n = normalizar(h)
+    const neto = /^(?:impnetogravadoiva|netograviva|netogravadoiva)(\d{1,3})$/.exec(n)
+    if (neto && DIGITOS[neto[1]] && !(`neto_${DIGITOS[neto[1]]}` in mapa)) return void (mapa[`neto_${DIGITOS[neto[1]]}`] = i)
+    const iva = /^iva(\d{1,3})$/.exec(n)
+    if (iva && iva[1] !== '0' && DIGITOS[iva[1]] && !(`iva_${DIGITOS[iva[1]]}` in mapa)) mapa[`iva_${DIGITOS[iva[1]]}`] = i
+  })
+  return mapa
+}

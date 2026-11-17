@@ -117,6 +117,23 @@ const SECCIONES: Seccion[] = [
     ],
   },
   {
+    id: 'libro_iva', titulo: 'Libro IVA Ventas y Compras (por alícuota)', quien: 'Contadores y asistentes con acceso al cliente',
+    resumen: 'Detalle de cada comprobante importado con el neto y el IVA separados por alícuota (21%, 10,5%, 27%, 5%, 2,5% y 0%), más no gravado, exento y otros tributos, con totales y descarga para Excel.',
+    pasos: [
+      'Importá los comprobantes emitidos y recibidos del cliente (a mano en «Importar» o desde «Carpetas ARCA»). Usá los archivos de «Mis Comprobantes» de ARCA: traen una columna por alícuota.',
+      'Entrá a la solapa «Libro IVA» y elegí el cliente y el período (por defecto el mes anterior).',
+      'Tocá «IVA Ventas (emitidos)» o «IVA Compras (recibidos)».',
+      'Revisá la tabla: cada comprobante muestra Neto e IVA por alícuota, No gravado, Exento, Otros tributos, IVA total y Total. Abajo ves los totales y el resumen por alícuota (débito o crédito fiscal).',
+      'Tocá «Descargar para Excel (CSV)» para llevarlo a una planilla, o «Imprimir / guardar PDF».',
+    ],
+    notas: [
+      'Las notas de crédito aparecen restando. Los comprobantes con ⚠ tienen datos a revisar (por ejemplo, un desglose que no suma el total).',
+      'Solo se muestran las alícuotas que tienen movimientos; con «Mostrar todas las alícuotas» aparecen todas.',
+      'Los comprobantes importados antes de esta mejora solo tenían totales. Si el IVA coincidía con una sola alícuota se completó solo; el resto aparece en «Gravado sin discriminar». Para completarlos, un administrador anula el lote en «Importar» y se vuelve a importar el archivo de ARCA.',
+      'Es una ayuda para armar el libro y la declaración: no reemplaza el Libro IVA Digital de ARCA ni incluye percepciones, retenciones ni saldos anteriores.',
+    ],
+  },
+  {
     id: 'tareas', titulo: 'Tareas', quien: 'Ver: miembros. Crear y ejecutar: permiso «Gestionar tareas» o administrador',
     resumen: 'Controles automáticos o manuales que generan avisos en la Agenda.',
     pasos: [

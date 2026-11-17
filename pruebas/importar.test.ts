@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict'
 import { leerCsv } from '../src/importar/csv'
 import { parseFecha, parseNumero, parseTipoComprobante, parseDocumento, normalizar } from '../src/importar/valores'
-import { detectarColumnas, encontrarEncabezado } from '../src/importar/columnas'
+import { columnasPorAlicuota, detectarColumnas, encontrarEncabezado } from '../src/importar/columnas'
 import { validarFilas } from '../src/importar/validar'
 
 let n = 0
@@ -149,8 +149,12 @@ prueba('recibidos reales: factura C sin desglose y neto solo en la columna IVA 0
   const c = vacia(); Object.assign(c, { 0: '1/9/2026', 1: '11', 2: '2', 3: '365', 7: '20202350640', 8: 'DEPETRIS', 22: '0', 23: '0', 24: '0', 25: '0', 26: '0', 27: '142000' })
   const d = vacia(); Object.assign(d, { 0: '3/9/2026', 1: '2', 2: '71', 3: '388033', 7: '30547000001', 11: '16500', 22: '', 23: '0', 24: '0', 25: '0', 26: '0', 27: '16500' })
   const a = vacia(); Object.assign(a, { 0: '2/9/2026', 1: '1', 2: '5541', 3: '6019', 7: '30507000001', 18: '4364,88', 19: '20785,12', 22: '20785,12', 23: '0', 24: '0', 25: '935,33', 26: '4364,88', 27: '26085,33' })
-  const r = validarFilas('comprobantes_recibidos', [c, d, a], m, 2, '2026-10-29', alic)
+  const por = columnasPorAlicuota(enc)
+  assert.deepEqual([por.neto_0, por.iva_2_5, por.neto_2_5, por.iva_10_5, por.neto_10_5, por.iva_21, por.neto_21, por.iva_27, por.neto_27], [11, 12, 13, 16, 17, 18, 19, 20, 21])
+  const r = validarFilas('comprobantes_recibidos', [c, d, a], m, 2, '2026-10-29', alic, por)
   assert.equal(r.rechazos.length, 0)
+  assert.deepEqual([r.validas[1].neto_0, r.validas[1].iva_21], [16500, 0]) // neto al 0%
+  assert.deepEqual([r.validas[2].neto_21, r.validas[2].iva_21, r.validas[2].neto_10_5], [20785.12, 4364.88, 0])
   assert.equal(r.validas[0].neto_no_gravado, 142000) // factura C: todo el total es costo sin IVA
   assert.equal(r.validas[1].neto_gravado, 16500) // neto tomado de la columna IVA 0%
   assert.equal(r.validas[2].neto_no_gravado, 0) // factura A normal: no se toca
@@ -170,6 +174,23 @@ prueba('Excel «Mis Comprobantes» (título arriba, columnas «Neto Gravado Tota
   const r = validarFilas('comprobantes_recibidos', filas.slice(2), mapa, 3, '2026-11-02', [8])
   assert.equal(r.rechazos.length, 0)
   assert.deepEqual([r.validas[0].neto_gravado, r.validas[0].iva, r.validas[0].total, r.validas[0].doc, r.validas[0].tipo_cbte], [240504.51, 50505.95, 312748.71, '30712154019', 1])
+})
+
+prueba('desglose por alícuota: varias alícuotas en un comprobante y deducción en planillas propias', () => {
+  const enc = ['Fecha', 'Tipo', 'Punto de Venta', 'Número Desde', 'Nro. Doc. Receptor', 'Denominación Receptor', 'Neto Grav. IVA 10,5%', 'IVA 10,5%', 'Neto Grav. IVA 21%', 'IVA 21%', 'Neto Gravado Total', 'Neto No Gravado', 'Op. Exentas', 'Otros Tributos', 'Total IVA', 'Imp. Total']
+  const m = detectarColumnas(enc, 'comprobantes_emitidos')
+  const por = columnasPorAlicuota(enc)
+  const f = ['05/10/2026', '1 - Factura A', 3, 77, 30500010912, 'CLIENTE SA', 1000, 105, 2000, 420, 3000, 50, 0, 0, 525, 3575]
+  const r = validarFilas('comprobantes_emitidos', [f], m, 2, '2026-11-02', [], por)
+  assert.equal(r.rechazos.length, 0)
+  assert.deepEqual([r.validas[0].neto_10_5, r.validas[0].iva_10_5, r.validas[0].neto_21, r.validas[0].iva_21], [1000, 105, 2000, 420])
+  // planilla propia (sin columnas por alicuota): una sola alicuota se deduce del IVA
+  const m2 = detectarColumnas(['Fecha de Emisión', 'Tipo de Comprobante', 'Punto de Venta', 'Número Desde', 'Imp. Neto Gravado', 'IVA', 'Imp. Total'], 'comprobantes_emitidos')
+  const g = (neto: number, iva: number) => ['10/09/2026', '1', '1', Math.round(neto), neto, iva, neto + iva]
+  const r2 = validarFilas('comprobantes_emitidos', [g(1000, 210), g(2000, 210)], m2, 2, '2026-11-02', [], {})
+  assert.deepEqual([r2.validas[0].neto_21, r2.validas[0].iva_21], [1000, 210])
+  assert.deepEqual([r2.validas[1].neto_21, r2.validas[1].neto_10_5], [0, 2000]) // 210 sobre 2000 = 10,5%
+  assert.equal(columnasPorAlicuota(['Total IVA', 'IVA']).iva_21, undefined)
 })
 
 console.log(`\n${n} grupos de pruebas OK`)

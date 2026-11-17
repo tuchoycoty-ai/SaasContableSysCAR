@@ -1,5 +1,5 @@
 // Prepara un archivo de ARCA para importarlo: CSV/XLSX de comprobantes o PDF de VEP / acuse de DJ.
-import { detectarColumnas, encontrarEncabezado, camposDe, type TipoImportacion } from './columnas'
+import { columnasPorAlicuota, detectarColumnas, encontrarEncabezado, camposDe, type TipoImportacion } from './columnas'
 import { huella, leerArchivo } from './leer'
 import { interpretarPdf, lineasDeItems, planDe, type AcuseDj, type Plan, type Vep } from './pdf'
 import { validarFilas, type Resultado } from './validar'
@@ -18,7 +18,7 @@ export async function prepararComprobantes(archivo: File, tipo: TipoImportacion)
   const faltan = camposDe(tipo).filter((c) => c.obligatorio && (mapa[c.id] ?? -1) < 0)
   if (faltan.length > 0) throw new Error(`Faltan columnas: ${faltan.map((c) => c.etiqueta).join(', ')}.`)
   const alicuotas = l.filas[enc].map((h, i) => (/^(impnetogravadoiva|netograviva)/.test(normalizar(h)) ? i : -1)).filter((i) => i >= 0)
-  const resultado = validarFilas(tipo, l.filas.slice(enc + 1), mapa, enc + 2, hoyLocal(), alicuotas)
+  const resultado = validarFilas(tipo, l.filas.slice(enc + 1), mapa, enc + 2, hoyLocal(), alicuotas, columnasPorAlicuota(l.filas[enc]))
   return { kind: 'comprobantes', tipo, nombre: l.nombre, hash: l.hash, resultado }
 }
 

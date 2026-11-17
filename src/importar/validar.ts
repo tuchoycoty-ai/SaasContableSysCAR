@@ -1,4 +1,4 @@
-import { camposDe, type TipoImportacion } from './columnas'
+import { ALICUOTAS, camposDe, type TipoImportacion } from './columnas'
 import { parseDocumento, parseEntero, parseFecha, parseNumero, parseTipoComprobante, textoCelda } from './valores'
 
 export type FilaLista = Record<string, string | number | null> & { fila: number }
@@ -32,6 +32,7 @@ export function validarFilas(
   primeraFila: number,
   hoy: string,
   alicuotas: number[] = [], // columnas "Imp. Neto Gravado IVA x%": se usan si "Neto Gravado Total" viene vacio
+  porAlicuota: Record<string, number> = {}, // neto_21, iva_21, ... -> columna (desglose para el libro de IVA)
 ): Resultado {
   const campos = camposDe(tipo)
   const validas: FilaLista[] = []
@@ -97,6 +98,24 @@ export function validarFilas(
         const n = parseNumero(bruto)
         if (n === null) return void rechazos.push({ fila, motivo: `El importe "${textoCelda(bruto)}" no es un número válido` })
         o[id] = Math.round(n * 100) / 100
+      }
+    }
+
+    if (tipo !== 'pagos') {
+      const claves = ['neto_0', ...ALICUOTAS.flatMap((a) => [`neto_${a}`, `iva_${a}`])]
+      for (const k of claves) {
+        const n = k in porAlicuota ? parseNumero(r[porAlicuota[k]]) : null
+        o[k] = n === null ? 0 : Math.round(n * 100) / 100
+      }
+      // Sin columnas por alicuota (planilla propia): si el IVA coincide con una sola alicuota, se deduce.
+      if (Object.keys(porAlicuota).length === 0 && Math.abs(Number(o.neto_gravado)) >= 10) {
+        const ng = Number(o.neto_gravado), iva = Number(o.iva)
+        const ok = [21, 10.5, 27, 5, 2.5, 0].find((t) => Math.abs(iva - Math.round(ng * t) / 100) <= 0.05)
+        if (ok !== undefined) {
+          const id = String(ok).replace('.', '_')
+          o[`neto_${id}`] = ng
+          if (ok !== 0) o[`iva_${id}`] = iva
+        }
       }
     }
 
