@@ -6,12 +6,25 @@ import type { PdfPreparado } from './preparar'
 export async function aplicarPdf(estudioId: string, clienteId: string, yo: string, p: PdfPreparado): Promise<string> {
   const partes: string[] = []
   if (p.plan.pago) {
-    const { error } = await supabase.rpc('confirmar_importacion', {
-      p_tenant: estudioId, p_client: clienteId, p_tipo: 'pagos', p_archivo: p.nombre, p_hash: p.hash,
-      p_filas: [{ fila: 1, ...p.plan.pago }], p_rechazos: [],
-    })
-    if (error) throw new Error(mensajeDb(error, 'No se pudo registrar el pago.'))
-    partes.push('pago registrado')
+    const fila = { fila: 1, ...p.plan.pago }
+    // Si el pago ya estaba cargado (de antes de que se guardara el detalle), solo se le completa el detalle.
+    const { data: completados, error: e0 } = await supabase.rpc('completar_pago', { p_tenant: estudioId, p_client: clienteId, p_fila: p.plan.pago })
+    if (e0) throw new Error(mensajeDb(e0, 'No se pudo completar el detalle del pago.'))
+    if (Number(completados) > 0) {
+      partes.push('pago ya registrado: se completó su detalle')
+    } else {
+      const { error } = await supabase.rpc('confirmar_importacion', {
+        p_tenant: estudioId, p_client: clienteId, p_tipo: 'pagos', p_archivo: p.nombre, p_hash: p.hash,
+        p_filas: [fila], p_rechazos: [],
+      })
+      if (error) throw new Error(mensajeDb(error, 'No se pudo registrar el pago.'))
+      partes.push('pago registrado')
+    }
+  }
+  if (p.plan.presentacion) {
+    const { error } = await supabase.rpc('registrar_presentacion', { p_tenant: estudioId, p_client: clienteId, p_datos: { ...p.plan.presentacion, archivo_nombre: p.nombre } })
+    if (error) throw new Error(mensajeDb(error, 'No se pudo registrar la presentación.'))
+    partes.push('presentación registrada')
   }
   const o = p.plan.obligacion
   if (o) {

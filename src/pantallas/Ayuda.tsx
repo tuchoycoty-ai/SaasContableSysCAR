@@ -134,6 +134,27 @@ const SECCIONES: Seccion[] = [
     ],
   },
   {
+    id: 'ddjj_vep', titulo: 'DDJJ presentadas y VEP pagados (detalle)', quien: 'Contadores y asistentes con acceso al cliente',
+    resumen: 'Muestra qué DDJJ se presentaron y qué VEP se pagaron: qué se pagó, el período o la cuota, si incluye intereses o multas, cuándo se pagó, cuándo vencía y si fue en término.',
+    pasos: [
+      'Bajá de ARCA los PDF: el «Acuse de recibo de DJ» de cada declaración y el «Comprobante de Pago» de cada VEP. Guardalos en la carpeta «DDJJ y VEP» (ver «Carpetas ARCA»).',
+      'En «Carpetas ARCA» revisá lo que dice cada archivo (por ejemplo «VEP 1688518471 · 94 INTERESES PUNITORIOS · cuota 3 · incluye $ 51.677,53 de intereses») y tocá «Confirmar».',
+      'Entrá a la solapa «DDJJ y VEP», elegí el cliente (o todos) y el rango de meses.',
+      'Arriba ves los totales: cuánto se pagó, cuánto de eso son intereses y cuántas DDJJ se presentaron.',
+      'En «Declaraciones juradas presentadas» ves fecha y hora, formulario, período, vencimiento, cantidad de registros, número de transacción, quién la presentó y el VEP asociado (o «Sin VEP cargado»).',
+      'En «VEP pagados» ves qué se pagó, el período o la cuota, el desglose por impuesto, los intereses, el importe, el vencimiento y si estuvo «En término» o «N días tarde», el medio de pago, el banco y los números de VEP y de operación.',
+      'Tildá «Solo pagos con intereses o multas» para ver únicamente los pagos con recargos. Con «Descargar CSV» te llevás todo a Excel.',
+      'En el Tablero (por cliente) y en Reportes ves el mismo resumen: intereses pagados por mes, por concepto y por cliente.',
+    ],
+    notas: [
+      'Intereses: se detectan por el subconcepto del VEP (por ejemplo «Intereses punitorios» o «resarcitorios»), por el campo «Intereses» de los honorarios o por renglones de intereses en el desglose.',
+      'Vencimiento: se toma del VEP cuando lo informa (honorarios) o del calendario que carga el holding para el F.931 y el IVA. Si no está cargado, queda en blanco y no se marca en término ni tarde.',
+      'Un VEP consolidado y sus subVEP son el mismo pago: los totales cuentan los subVEP (que traen el detalle) y el consolidado queda marcado como ya incluido.',
+      'Los pagos que cargaste antes de esta mejora no tienen el detalle. Para completarlos: «Carpetas ARCA» → «Volver a leer los PDF ya procesados» → «Confirmar todos los listos». No se duplica nada.',
+      'SysCAR no genera VEP ni presenta DDJJ en ARCA: solo registra lo que ya hiciste.',
+    ],
+  },
+  {
     id: 'tareas', titulo: 'Tareas', quien: 'Ver: miembros. Crear y ejecutar: permiso «Gestionar tareas» o administrador',
     resumen: 'Controles automáticos o manuales que generan avisos en la Agenda.',
     pasos: [
@@ -270,6 +291,7 @@ const PROBLEMAS: [string, string][] = [
   ['Al cargar la extensión Chrome dice «Falta el archivo de manifiesto»', 'Elegiste una carpeta de más afuera. Entrá una carpeta más y elegí la que muestra el archivo manifest.json a la vista.'],
   ['Chrome muestra «Guardar como» en cada descarga de la extensión', 'En Chrome → Configuración → Descargas apagá «Preguntar dónde guardar cada archivo antes de descargarlo».'],
   ['La extensión dice «Abrí Mis Comprobantes…»', 'La pestaña al frente tiene que ser la de «Mis Comprobantes» de ARCA, con tu sesión iniciada.'],
+  ['Un VEP figura «Sin detalle» o no muestra intereses', 'Se cargó antes de que se guardara el detalle. En «Carpetas ARCA» tocá «Volver a leer los PDF ya procesados» y confirmá de nuevo.'],
   ['«No coincide con ningún cliente» en Carpetas ARCA', 'Cargá primero el cliente con ese CUIT, o pedí que te lo asignen.'],
   ['El tablero está vacío', 'Solo muestra datos importados en el rango de fechas elegido. Ampliá el rango o importá los comprobantes.'],
   ['La consulta de CUIT a ARCA falla', 'Verificá que el estudio tenga un certificado «Activo» y probá «Probar conexión con ARCA» en Certificados ARCA.'],

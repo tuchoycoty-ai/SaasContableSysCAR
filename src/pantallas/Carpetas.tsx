@@ -5,6 +5,7 @@ import { useClientes } from '../lib/useClientes'
 import { fechaCorta, formatoCuit, mensajeDb, pesos, soloDigitos } from '../lib/utiles'
 import type { TipoImportacion } from '../importar/columnas'
 import { prepararComprobantes, prepararPdf, type Preparado } from '../importar/preparar'
+import { huella } from '../importar/leer'
 import { aplicarPdf } from '../importar/aplicar'
 
 // Carpetas de trabajo: el usuario elige una carpeta por acción y SysCAR revisa cada tanto si hay archivos nuevos.
@@ -71,6 +72,23 @@ export default function Carpetas({ estudio, permisos, yo }: { estudio: Estudio; 
   const marcar = useCallback((hash: string) => {
     try { const s = procesados(); s.add(hash); localStorage.setItem(claveProc, JSON.stringify([...s].slice(-2000))) } catch { /* sin almacenamiento: se avisa por duplicado en la base */ }
   }, [claveProc, procesados])
+
+  // Vuelve a ofrecer los PDF de «DDJJ y VEP» ya procesados, para completar el detalle (intereses, período, banco…) de lo cargado antes.
+  async function releerPdf() {
+    const d = dirsRef.current.ddjj_vep
+    if (!d) { setError('Primero elegí la carpeta de «DDJJ y VEP».'); return }
+    setError(null)
+    try {
+      const s = procesados()
+      for await (const [nombre, ent] of d.entries()) {
+        if (ent.kind !== 'file' || !nombre.toLowerCase().endsWith('.pdf')) continue
+        s.delete(await huella(await (await ent.getFile()).arrayBuffer()))
+      }
+      localStorage.setItem(claveProc, JSON.stringify([...s]))
+      for (const [k, it] of [...vistos.current]) if (it.slot === 'ddjj_vep') vistos.current.delete(k)
+      await buscar(dirsRef.current)
+    } catch { setError('No se pudieron releer los PDF. Revisá que el navegador tenga permiso sobre la carpeta.') }
+  }
 
   const clientePorCuit = useCallback((cuit: string) => clientes.find((c) => soloDigitos(c.cuit) === cuit) ?? null, [clientes])
 
@@ -198,8 +216,8 @@ export default function Carpetas({ estudio, permisos, yo }: { estudio: Estudio; 
     if (p.kind === 'comprobantes') return `${p.resultado.validas.length} filas válidas, ${p.resultado.rechazos.length} con errores${p.resultado.duplicadasEnArchivo.length ? `, ${p.resultado.duplicadasEnArchivo.length} repetidas` : ''}`
     const d = p.doc
     return d.tipo === 'vep'
-      ? `VEP ${d.nroVep} · ${d.tipoPago} · ${pesos(d.importe)} · pagado ${fechaCorta(d.fechaPago)}`
-      : `Acuse F.${d.formulario} ${d.nombre}${d.periodo ? ` · período ${d.periodo}` : ''} · presentado ${fechaCorta(d.fechaPresentacion)}`
+      ? `VEP ${d.nroVep} · ${d.tipoPago}${d.subconcepto ? ` · ${d.subconcepto}` : ''}${d.periodoTxt ? ` · período ${d.periodoTxt}` : ''}${d.cuota ? ` · cuota ${d.cuota}` : ''} · ${pesos(d.importe)}${d.intereses > 0 ? ` (incluye ${pesos(d.intereses)} de intereses)` : ''} · pagado ${fechaCorta(d.fechaPago)}${d.hora ? ` ${d.hora}` : ''}`
+      : `Acuse F.${d.formulario} ${d.nombre}${d.periodo ? ` · período ${d.periodo}` : ''} · presentado ${fechaCorta(d.fechaPresentacion)}${d.hora ? ` ${d.hora}` : ''}${d.registros !== null ? ` · ${d.registros} registros` : ''}`
   }
 
   return (
@@ -236,6 +254,7 @@ export default function Carpetas({ estudio, permisos, yo }: { estudio: Estudio; 
       {soportado && (
         <p className="suave">
           <button className="secundario" onClick={() => buscar(dirs)} disabled={buscando}>{buscando ? 'Buscando…' : 'Buscar ahora'}</button>{' '}
+          <button className="secundario" onClick={releerPdf} disabled={buscando || !dirs.ddjj_vep} title="Vuelve a ofrecer los PDF de DDJJ y VEP ya procesados para completar su detalle">Volver a leer los PDF ya procesados</button>{' '}
           {ultima && `Última revisión: ${ultima.toLocaleTimeString('es-AR')}`}
         </p>
       )}

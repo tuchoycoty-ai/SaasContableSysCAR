@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import type { Estudio, EstadoDato } from '../lib/types'
 import { useClientes } from '../lib/useClientes'
 import { formatoCuit, hoyLocal, pesos } from '../lib/utiles'
+import ResumenDdjjVep from './ResumenDdjjVep'
 
 type Fila = {
   mes: string
@@ -282,11 +283,9 @@ export default function Tablero({ estudio }: { estudio: Estudio }) {
         </>
       )}
 
-      <h3>Todavía no disponible</h3>
-      <p className="suave">
-        VEP pagados y pendientes, declaraciones juradas, alertas fiscales e indicadores financieros con previsiones se habilitan en
-        las próximas fases. No se muestran números de relleno: cuando existan datos reales, aparecen acá.
-      </p>
+      {clienteId && cliente && <ResumenDdjjVep estudio={estudio} clienteId={clienteId} cuit={cliente.cuit} desde={desde} hasta={hasta} />}
+
+      <p className="suave">Alertas fiscales e indicadores financieros con previsiones se habilitan en las próximas fases. No se muestran números de relleno.</p>
     </section>
   )
 }

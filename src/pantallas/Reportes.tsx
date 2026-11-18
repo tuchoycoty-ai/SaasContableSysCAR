@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import type { Estudio } from '../lib/types'
 import { useClientes } from '../lib/useClientes'
 import { descargarCsv, formatoCuit, hoyLocal, pesos } from '../lib/utiles'
+import { cargarPagos, paraTotales, totalesPagos, type PagoArca } from '../lib/ddjjVep'
 
 type FilaMes = { mes: string; rubro: 'emitido' | 'recibido' | 'pago'; estado_dato: string; cantidad: number; neto: number; iva: number; total: number }
 type Cartera = { client_id: string; razon_social: string; cuit: string; regimen: string; emitidos_neto: number; recibidos_neto: number; iva_debito: number; iva_credito: number; cantidad: number; sin_confirmar: number }
@@ -28,6 +29,7 @@ export default function Reportes({ estudio }: { estudio: Estudio }) {
   const [meses, setMeses] = useState<FilaMes[]>([])
   const [topV, setTopV] = useState<Top[]>([])
   const [topC, setTopC] = useState<Top[]>([])
+  const [pagosDet, setPagosDet] = useState<PagoArca[]>([]) // VEP pagados con detalle (intereses, concepto) del alcance elegido
   const [error, setError] = useState<string | null>(null)
   const [cargando, setCargando] = useState(false)
 
@@ -59,6 +61,7 @@ export default function Reportes({ estudio }: { estudio: Estudio }) {
           const t = (x: unknown) => ((x ?? []) as Top[]).map((f) => ({ ...f, cantidad: num(f.cantidad), neto: num(f.neto), total: num(f.total) }))
           setTopV(t(v.data)); setTopC(t(c.data))
         })
+    cargarPagos(estudio.id, clienteId, d, h).then((p) => { if (!cancelado) setPagosDet(p) }).catch(() => { if (!cancelado) setPagosDet([]) })
     consulta.finally(() => { if (!cancelado) setCargando(false) })
     return () => { cancelado = true }
   }, [estudio.id, clienteId, desde, hasta])
@@ -81,6 +84,24 @@ export default function Reportes({ estudio }: { estudio: Estudio }) {
     })
   }, [meses])
 
+  const tp = useMemo(() => totalesPagos(pagosDet), [pagosDet])
+  const interesesMes = (mes: string) => paraTotales(pagosDet).filter((p) => p.fecha.slice(0, 7) === mes).reduce((a, p) => a + p.intereses, 0)
+  const porCliente = useMemo(() => {
+    const m: Record<string, { total: number; intereses: number }> = {}
+    for (const p of paraTotales(pagosDet)) { const x = (m[p.client_id] ??= { total: 0, intereses: 0 }); x.total += p.importe; x.intereses += p.intereses }
+    return m
+  }, [pagosDet])
+  const porConcepto = useMemo(() => {
+    const m = new Map<string, { nombre: string; cantidad: number; importe: number; intereses: number }>()
+    for (const p of paraTotales(pagosDet)) {
+      const nombre = p.tipo_pago ? `${p.tipo_pago}${p.naturaleza === 'intereses' ? ' (intereses)' : p.naturaleza === 'multa' ? ' (multa)' : ''}` : p.concepto
+      const x = m.get(nombre) ?? { nombre, cantidad: 0, importe: 0, intereses: 0 }
+      x.cantidad++; x.importe += p.importe; x.intereses += p.intereses
+      m.set(nombre, x)
+    }
+    return [...m.values()].sort((a, b) => b.importe - a.importe)
+  }, [pagosDet])
+
   const tot = (k: 'ventas' | 'compras' | 'pagos' | 'iva') => serie.reduce((a, f) => a + f[k], 0)
   const mejor = serie.length ? serie.reduce((a, b) => (b.ventas > a.ventas ? b : a)) : null
   const peor = serie.length ? serie.reduce((a, b) => (b.ventas < a.ventas ? b : a)) : null
@@ -92,13 +113,13 @@ export default function Reportes({ estudio }: { estudio: Estudio }) {
   function exportar() {
     if (clienteId === '') {
       descargarCsv(`cartera-${desde}-a-${hasta}.csv`, [
-        ['Cliente', 'CUIT', 'Régimen', 'Facturado neto', 'Compras neto', 'Resultado', 'IVA débito', 'IVA crédito', 'Posición IVA', 'Comprobantes', 'Sin confirmar'],
-        ...cartera.map((c) => [c.razon_social, c.cuit, c.regimen, c.emitidos_neto, c.recibidos_neto, c.emitidos_neto - c.recibidos_neto, c.iva_debito, c.iva_credito, c.iva_debito - c.iva_credito, c.cantidad, c.sin_confirmar]),
+        ['Cliente', 'CUIT', 'Régimen', 'Facturado neto', 'Compras neto', 'Resultado', 'IVA débito', 'IVA crédito', 'Posición IVA', 'Comprobantes', 'Sin confirmar', 'Impuestos pagados (VEP)', 'Intereses pagados'],
+        ...cartera.map((c) => [c.razon_social, c.cuit, c.regimen, c.emitidos_neto, c.recibidos_neto, c.emitidos_neto - c.recibidos_neto, c.iva_debito, c.iva_credito, c.iva_debito - c.iva_credito, c.cantidad, c.sin_confirmar, porCliente[c.client_id]?.total ?? 0, porCliente[c.client_id]?.intereses ?? 0]),
       ])
     } else {
       descargarCsv(`analisis-${cliente?.razon_social ?? 'cliente'}-${desde}-a-${hasta}.csv`, [
-        ['Mes', 'Ventas netas', 'Compras netas', 'Resultado', 'Margen %', 'Variación ventas %', 'Posición IVA', 'Impuestos pagados', 'Carga tributaria %'],
-        ...serie.map((f) => [f.mes, f.ventas, f.compras, f.resultado, f.margen ?? '', f.variacion ?? '', f.iva, f.pagos, f.carga ?? '']),
+        ['Mes', 'Ventas netas', 'Compras netas', 'Resultado', 'Margen %', 'Variación ventas %', 'Posición IVA', 'Impuestos pagados', 'Intereses incluidos', 'Carga tributaria %'],
+        ...serie.map((f) => [f.mes, f.ventas, f.compras, f.resultado, f.margen ?? '', f.variacion ?? '', f.iva, f.pagos, interesesMes(f.mes), f.carga ?? '']),
       ])
     }
   }
@@ -135,7 +156,7 @@ export default function Reportes({ estudio }: { estudio: Estudio }) {
             {totC('sin_confirmar') > 0 && <p className="aviso">{totC('sin_confirmar')} comprobantes de la cartera todavía no están confirmados.</p>}
             <div className="tabla-scroll">
               <table>
-                <thead><tr><th>Cliente</th><th>Régimen</th><th>Facturado (neto)</th><th>Compras (neto)</th><th>Resultado</th><th>Posición IVA</th><th>Comprob.</th><th>Sin confirmar</th><th>Obligaciones pendientes</th></tr></thead>
+                <thead><tr><th>Cliente</th><th>Régimen</th><th>Facturado (neto)</th><th>Compras (neto)</th><th>Resultado</th><th>Posición IVA</th><th>Comprob.</th><th>Sin confirmar</th><th>Obligaciones pendientes</th><th>Impuestos pagados</th><th>Intereses</th></tr></thead>
                 <tbody>
                   {cartera.map((c) => (
                     <tr key={c.client_id}>
@@ -143,10 +164,11 @@ export default function Reportes({ estudio }: { estudio: Estudio }) {
                       <td>{pesos(c.emitidos_neto)}</td><td>{pesos(c.recibidos_neto)}</td><td>{pesos(c.emitidos_neto - c.recibidos_neto)}</td>
                       <td>{c.regimen === 'responsable_inscripto' ? pesos(c.iva_debito - c.iva_credito) : <span className="suave">—</span>}</td>
                       <td>{c.cantidad}</td><td>{c.sin_confirmar > 0 ? <span className="badge pendiente">{c.sin_confirmar}</span> : 0}</td><td>{pendientes[c.client_id] ?? 0}</td>
+                      <td>{pesos(porCliente[c.client_id]?.total ?? 0)}</td><td>{(porCliente[c.client_id]?.intereses ?? 0) > 0 ? <span className="badge pendiente">{pesos(porCliente[c.client_id]!.intereses)}</span> : <span className="suave">—</span>}</td>
                     </tr>
                   ))}
                   <tr>
-                    <th>Total</th><td></td><th>{pesos(totC('emitidos_neto'))}</th><th>{pesos(totC('recibidos_neto'))}</th><th>{pesos(totC('emitidos_neto') - totC('recibidos_neto'))}</th><td></td><th>{totC('cantidad')}</th><td></td><td></td>
+                    <th>Total</th><td></td><th>{pesos(totC('emitidos_neto'))}</th><th>{pesos(totC('recibidos_neto'))}</th><th>{pesos(totC('emitidos_neto') - totC('recibidos_neto'))}</th><td></td><th>{totC('cantidad')}</th><td></td><td></td><th>{pesos(tp.total)}</th><th>{pesos(tp.intereses)}</th>
                   </tr>
                 </tbody>
               </table>
@@ -164,19 +186,33 @@ export default function Reportes({ estudio }: { estudio: Estudio }) {
               <div className="indicador"><span className="suave">Compras netas</span><strong>{pesos(tot('compras'))}</strong></div>
               <div className="indicador"><span className="suave">Resultado estimado</span><strong>{pesos(tot('ventas') - tot('compras'))}</strong><span className="suave">Margen {pct(tot('ventas') > 0 ? ((tot('ventas') - tot('compras')) / tot('ventas')) * 100 : null)}</span></div>
               <div className="indicador"><span className="suave">Impuestos pagados</span><strong>{pesos(tot('pagos'))}</strong><span className="suave">Carga {pct(tot('ventas') > 0 ? (tot('pagos') / tot('ventas')) * 100 : null)} de las ventas</span></div>
+              <div className="indicador"><span className="suave">Intereses y multas pagados</span><strong>{pesos(tp.intereses + tp.multas)}</strong><span className="suave">dentro de los impuestos pagados</span></div>
             </div>
             {mejor && peor && serie.length > 1 && <p className="suave">Mejor mes de ventas: {mejor.mes} ({pesos(mejor.ventas)}). Menor: {peor.mes} ({pesos(peor.ventas)}).</p>}
             <h3>Evolución mensual</h3>
             <div className="tabla-scroll">
               <table>
-                <thead><tr><th>Mes</th><th>Ventas</th><th>Var.</th><th>Compras</th><th>Resultado</th><th>Margen</th><th>Posición IVA</th><th>Impuestos pagados</th><th>Carga</th></tr></thead>
+                <thead><tr><th>Mes</th><th>Ventas</th><th>Var.</th><th>Compras</th><th>Resultado</th><th>Margen</th><th>Posición IVA</th><th>Impuestos pagados</th><th>Intereses</th><th>Carga</th></tr></thead>
                 <tbody>
                   {serie.map((f) => (
-                    <tr key={f.mes}><td>{f.mes}</td><td>{pesos(f.ventas)}</td><td>{pct(f.variacion)}</td><td>{pesos(f.compras)}</td><td>{pesos(f.resultado)}</td><td>{pct(f.margen)}</td><td>{pesos(f.iva)}</td><td>{pesos(f.pagos)}</td><td>{pct(f.carga)}</td></tr>
+                    <tr key={f.mes}><td>{f.mes}</td><td>{pesos(f.ventas)}</td><td>{pct(f.variacion)}</td><td>{pesos(f.compras)}</td><td>{pesos(f.resultado)}</td><td>{pct(f.margen)}</td><td>{pesos(f.iva)}</td><td>{pesos(f.pagos)}</td><td>{interesesMes(f.mes) > 0 ? pesos(interesesMes(f.mes)) : <span className="suave">—</span>}</td><td>{pct(f.carga)}</td></tr>
                   ))}
                 </tbody>
               </table>
             </div>
+            <h3>Impuestos pagados por concepto</h3>
+            {porConcepto.length === 0 ? <p className="suave">No hay VEP pagados cargados en este período.</p> : (
+              <div className="tabla-scroll">
+                <table>
+                  <thead><tr><th>Concepto</th><th>Pagos</th><th>Importe</th><th>Intereses incluidos</th></tr></thead>
+                  <tbody>
+                    {porConcepto.map((x) => <tr key={x.nombre}><td>{x.nombre}</td><td>{x.cantidad}</td><td>{pesos(x.importe)}</td><td>{x.intereses > 0 ? pesos(x.intereses) : <span className="suave">—</span>}</td></tr>)}
+                    <tr><th>Total</th><th>{tp.cantidad}</th><th>{pesos(tp.total)}</th><th>{pesos(tp.intereses)}</th></tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <p className="suave">El detalle de cada VEP (qué se pagó, período, banco, vencimiento) está en la solapa «DDJJ y VEP».{tp.sinDetalle > 0 ? ` ${tp.sinDetalle} pago(s) todavía sin detalle: se completan releyendo los PDF en «Carpetas ARCA».` : ''}</p>
             {[{ t: 'Principales clientes (por ventas)', d: topV, base: totalTopV }, { t: 'Principales proveedores (por compras)', d: topC, base: totalTopC }].map((b) => (
               <div key={b.t}>
                 <h3>{b.t}</h3>

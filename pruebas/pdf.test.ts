@@ -58,4 +58,36 @@ prueba('arma renglones por altura y orden horizontal', () => {
   assert.deepEqual(lineasDeItems([it('1690146345', 150, 733), it('Nro. VEP:', 109, 733), it(' ', 145, 733), it('ARCA', 150, 718), it('Organismo Recaudador:', 57, 718)]),
     ['Nro. VEP: 1690146345', 'Organismo Recaudador: ARCA'])
 })
+prueba('detalle del VEP: intereses, cuota, banco, desglose y vencimiento; acuse completo', () => {
+  const sub = interpretarPdf(['VEP', 'Comprobante de Pago', 'Datos del subVEP:', 'Nro. subVEP: 1688518471', 'Tipo de Pago: ARCA - OTROS PAGOS', 'Descripción Reducida: ARCA2026', 'CUIT: 20-11111111-2',
+    'Concepto: 191 ANTICIPOS', 'Subconcepto: 94 INTERESES PUNITORIOS', 'Período: 2026', 'ANTICIPO/CUOTA: 3', 'Corresponde al VEP Consolidado: 1688518470', 'GANANCIAS SOCIEDADES (10) $51.677,53',
+    'Datos del comprobante de Pago:', 'Entidad de Pago: INTERBANKING', 'Medio de Pago: HomeBanking-EFECTIVO', 'Debito en cuenta del Banco: BANCO CREDICOOP COOPERATIVO', 'LIMITADO',
+    'Nro. de Transacción: 2254889066', 'Fecha de Pago: 2026-10-05 Hora: 13:57:39', 'IMPORTE PAGADO $51.677,53'])
+  assert.ok(sub.ok && sub.doc.tipo === 'vep')
+  if (sub.ok && sub.doc.tipo === 'vep') {
+    const d = sub.doc
+    assert.deepEqual([d.naturaleza, d.intereses, d.cuota, d.subconcepto, d.hora, d.banco, d.entidad], ['intereses', 51677.53, '3', '94 INTERESES PUNITORIOS', '13:57:39', 'BANCO CREDICOOP COOPERATIVO LIMITADO', 'INTERBANKING'])
+    assert.deepEqual(d.detalle, [{ nombre: 'GANANCIAS SOCIEDADES', codigo: '10', importe: 51677.53 }])
+    const p = planDe(d)
+    assert.equal(p.pago?.intereses, 51677.53)
+    assert.equal(p.pago?.vep_consolidado, '1688518470')
+  }
+  const hon = interpretarPdf(['VEP', 'Comprobante de Pago', 'Nro. VEP: 1690146345', 'Tipo de Pago: Honorarios de Ejecuciones Fiscales -', 'Repres. del Fisco', 'Descripción Reducida: HEF-RF', 'CUIT: 20-11111111-2',
+    'HONORARIOS: 972417.83', 'INTERESES: 1500.00', 'FECHA VTO. HONORARIO: 2026-10-20', 'PERIODO DE LA BOLETA: 2026', 'HONORARIOS DE REPRES.DEL $972.417,83', 'FISCO (49)',
+    'Datos del comprobante de Pago:', 'Fecha de Pago: 2026-10-06 Hora: 09:07:23', 'IMPORTE PAGADO $972.417,83'])
+  assert.ok(hon.ok && hon.doc.tipo === 'vep')
+  if (hon.ok && hon.doc.tipo === 'vep') {
+    assert.deepEqual([hon.doc.naturaleza, hon.doc.intereses, hon.doc.vence, hon.doc.tipoPago, hon.doc.periodoTxt], ['honorarios', 1500, '2026-10-20', 'Honorarios de Ejecuciones Fiscales - Repres. del Fisco', '2026'])
+    assert.deepEqual(hon.doc.detalle, [{ nombre: 'HONORARIOS DE REPRES.DEL FISCO', codigo: '49', importe: 972417.83 }])
+  }
+  const dj = interpretarPdf(['Presentación de DJ por Internet', 'Acuse de recibo de DJ', 'Formulario: 931 v4700 - EMPLEADOR DJ', 'MENSUAL-SUSS', 'CUIT: 20-11111111-2', 'Impuesto: 301 - EMPLEADOR-APORTES SEG.', 'SOCIAL',
+    'Concepto: 19 - OBLIGACION MENSUAL/ANUAL', 'Período: 2026-04', 'Nro. verificador: 565439', 'Cantidad de registros: 135', 'Fecha de Presentación: 2026-05-12 Hora: 08:48:35', 'Nro. de Transacción: 1169546955',
+    'Presentada por el Usuario: 20325375486', 'Código de barras para pagar en entidades habilitadas', '19313071720011600030104264'])
+  assert.ok(dj.ok && dj.doc.tipo === 'dj')
+  if (dj.ok && dj.doc.tipo === 'dj') {
+    assert.deepEqual([dj.doc.nombre, dj.doc.version, dj.doc.impuesto, dj.doc.hora, dj.doc.registros, dj.doc.presentadaPor, dj.doc.codigoBarras], ['EMPLEADOR DJ MENSUAL-SUSS', 'v4700', '301 - EMPLEADOR-APORTES SEG. SOCIAL', '08:48:35', 135, '20325375486', '19313071720011600030104264'])
+    assert.equal(planDe(dj.doc).presentacion?.periodo, '2026-04')
+  }
+})
+
 console.log(`\n${n} grupos de pruebas OK`)
