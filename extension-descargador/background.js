@@ -2,6 +2,8 @@
 // El estado vive en chrome.storage (clave «job»); si Chrome apaga este proceso, el trabajo queda en pausa y se retoma con «Continuar».
 import { leerPersonas, leerPersonaActiva, prepararBusqueda, buscarYEsperar, clickExcel } from './paginas.js'
 import { construirCola, nombreArchivo } from './lib/fechas.js'
+import { pasoVep } from './paginasVep.js'
+import { validarPlan, importeParaCampo, importeVisible, campoParaEtiqueta, etiquetaItem } from './lib/vep.js'
 
 const BASE = 'https://fes.afip.gob.ar/mcmp/jsp/'
 const ERRORES_SEGUIDOS_MAX = 3
@@ -217,6 +219,157 @@ const acciones = {
     return true
   },
 }
+
+// ---------- VEP recurrentes: se cargan en «VEPs a enviar» y se frena ahí (nunca se elige medio de pago) ----------
+const SETI = 'https://seti.afip.gob.ar/setiweb/'
+let corriendoVep = false
+let latidoVep = null
+const leerJobVep = async () => (await chrome.storage.local.get('jobVep')).jobVep || null
+const guardarJobVep = (jobVep) => chrome.storage.local.set({ jobVep })
+
+;(async () => {
+  const j = await leerJobVep()
+  if (j && j.estado === 'corriendo') {
+    j.estado = 'pausado'
+    j.mensaje = 'Se interrumpió (Chrome reinició la extensión). Tocá «Continuar».'
+    await guardarJobVep(j)
+  }
+})()
+
+async function pasoEn(tabId, paso, args = {}) {
+  const [r] = await chrome.scripting.executeScript({ target: { tabId }, world: 'ISOLATED', func: pasoVep, args: [paso, args] })
+  const res = r ? r.result : null
+  if (!res) throw new Error('ARCA no respondió.')
+  if (res.sesion) throw new SesionPerdida(res.motivo)
+  if (!res.ok) { const e = new Error(res.motivo || 'Falló un paso.'); e.disponibles = res.disponibles; throw e }
+  return res
+}
+
+async function cargarUnVep(tabId, x) {
+  const tab = await chrome.tabs.get(tabId)
+  if (!tab.url || !tab.url.startsWith(SETI)) throw new SesionPerdida('La pestaña ya no está en «Presentación de DDJJ y Pagos».')
+  const visible = importeVisible(x.importe)
+  await pasoEn(tabId, 'irAGestion')
+  const { filas } = await pasoEn(tabId, 'filas')
+  if (filas.some((f) => f.cuit === x.cuit && f.importe.replace(/ /g, ' ').includes(visible) && f.desc.toLowerCase().includes(x.tipoPago.toLowerCase().split(' - ').pop().slice(0, 6)))) {
+    return { estado: 'ya_cargado', detalle: 'Ya estaba en «VEPs a enviar».' }
+  }
+  await pasoEn(tabId, 'abrirNuevo')
+  await pasoEn(tabId, 'elegirTipo', { cuit: x.cuit, grupo: x.grupo, tipoPago: x.tipoPago })
+  const { listas } = await pasoEn(tabId, 'etiquetas')
+  const campos = []
+  for (const etiqueta of listas) {
+    const c = campoParaEtiqueta(etiqueta, x)
+    if (!c) throw new Error(`ARCA pide un dato que no sé completar: «${etiqueta}». Cargalo a mano o avisame.`)
+    campos.push({ etiqueta, valor: c.valor })
+  }
+  await pasoEn(tabId, 'datosPago', { campos, importe: importeParaCampo(x.importe) })
+  await pasoEn(tabId, 'revisar', { importeVisible: visible, cuit: x.cuit })
+  await pasoEn(tabId, 'verFila', { importeVisible: visible, cuit: x.cuit })
+  return { estado: 'ok', detalle: `Cargado en «VEPs a enviar»: $ ${visible}` }
+}
+
+async function correrVep() {
+  if (corriendoVep) return
+  corriendoVep = true
+  latidoVep = setInterval(() => chrome.runtime.getPlatformInfo(() => {}), 20000)
+  let seguidos = 0
+  try {
+    for (;;) {
+      let job = await leerJobVep()
+      if (!job || job.estado !== 'corriendo') break
+      chrome.action.setBadgeText({ text: `${job.i}/${job.cola.length}` })
+      if (job.i >= job.cola.length) {
+        const ok = job.resultados.filter((r) => r.estado === 'ok' || r.estado === 'ya_cargado').length
+        job.estado = 'terminado'
+        job.mensaje = ok
+          ? `Listo: ${ok} VEP en «VEPs a enviar». Revisalos en ARCA y tocá «Seleccioná medio de pago» (eso lo hacés vos).`
+          : 'Terminó sin cargar ningún VEP. Mirá el detalle.'
+        await guardarJobVep(job)
+        break
+      }
+      const x = job.cola[job.i]
+      let r
+      try {
+        r = await cargarUnVep(job.tabId, x)
+        seguidos = 0
+      } catch (e) {
+        if (e instanceof SesionPerdida) {
+          job = (await leerJobVep()) || job
+          job.estado = 'pausado'
+          job.mensaje = `${e.message} Iniciá sesión, abrí «Presentación de DDJJ y Pagos» y tocá «Continuar». (Ojo: «VEPs a enviar» se vacía si la sesión se pierde; los ya cargados se revisan al continuar.)`
+          await guardarJobVep(job)
+          break
+        }
+        r = { estado: 'error', detalle: e.message + (e.disponibles && e.disponibles.length ? ` Opciones que ofrece ARCA: ${e.disponibles.slice(0, 12).join(' / ')}` : '') }
+        seguidos++
+      }
+      job = await leerJobVep()
+      if (!job || job.estado !== 'corriendo') break
+      job.resultados.push({ id: x.id, cliente: x.cliente, etiqueta: etiquetaItem(x), ...r })
+      job.i++
+      if (seguidos >= ERRORES_SEGUIDOS_MAX) {
+        job.estado = 'pausado'
+        job.mensaje = `Hubo ${seguidos} errores seguidos; paré para no insistir con ARCA. Revisá el detalle y tocá «Continuar».`
+      }
+      await guardarJobVep(job)
+      if (job.estado !== 'corriendo') break
+      await pausaCorta()
+    }
+  } finally {
+    corriendoVep = false
+    clearInterval(latidoVep)
+    chrome.action.setBadgeText({ text: '' })
+  }
+}
+
+async function pestañaDeSeti() {
+  const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
+  const tab = tabs[0]
+  if (!tab || !tab.url || !tab.url.startsWith(SETI)) {
+    throw new Error('Abrí «Presentación de DDJJ y Pagos» desde el portal de ARCA (con tu sesión iniciada) y dejá esa pestaña al frente.')
+  }
+  return tab.id
+}
+
+Object.assign(acciones, {
+  async cargarPlan({ plan }) {
+    const v = validarPlan(plan)
+    if (!v.ok) throw new Error(v.error)
+    await chrome.storage.local.set({ planVep: { items: v.items, cargadoEn: new Date().toISOString() } })
+    return v.items
+  },
+  async iniciarVep({ ids }) {
+    if (corriendoVep) throw new Error('Ya hay una carga de VEP en curso.')
+    const { planVep } = await chrome.storage.local.get('planVep')
+    const cola = ((planVep && planVep.items) || []).filter((x) => ids.includes(x.id))
+    if (!cola.length) throw new Error('Tildá al menos un VEP.')
+    const tabId = await pestañaDeSeti()
+    await guardarJobVep({ estado: 'corriendo', tabId, cola, i: 0, resultados: [], mensaje: 'Cargando VEP en ARCA… no uses esa pestaña mientras tanto.', inicio: new Date().toISOString() })
+    correrVep()
+    return true
+  },
+  async continuarVep() {
+    const job = await leerJobVep()
+    if (!job || job.estado !== 'pausado') throw new Error('No hay nada para continuar.')
+    job.tabId = await pestañaDeSeti()
+    job.estado = 'corriendo'
+    job.mensaje = 'Cargando VEP en ARCA… no uses esa pestaña mientras tanto.'
+    await guardarJobVep(job)
+    correrVep()
+    return true
+  },
+  async detenerVep() {
+    const job = await leerJobVep()
+    if (job && job.estado === 'corriendo') { job.estado = 'detenido'; job.mensaje = 'Detenido por vos.'; await guardarJobVep(job) }
+    return true
+  },
+  async limpiarVep() {
+    await chrome.storage.local.remove('jobVep')
+    chrome.action.setBadgeText({ text: '' })
+    return true
+  },
+})
 
 chrome.runtime.onMessage.addListener((msg, _sender, responder) => {
   const f = acciones[msg && msg.accion]

@@ -1,4 +1,4 @@
-# SysCAR · Descargador de Mis Comprobantes (extensión de Chrome/Edge)
+# SysCAR · Descargador y VEP de ARCA (extensión de Chrome/Edge)
 
 Baja en Excel los comprobantes **emitidos** y **recibidos** de todos tus clientes desde «Mis Comprobantes» de ARCA,
 haciendo los mismos clics que harías vos, con **tu sesión ya iniciada**.
@@ -6,8 +6,8 @@ haciendo los mismos clics que harías vos, con **tu sesión ya iniciada**.
 ## Qué NO hace (a propósito)
 - No guarda ni lee tu Clave Fiscal: el ingreso lo hacés vos como siempre.
 - No sube nada a ningún servidor: solo deja archivos en tu carpeta Descargas. SysCAR los lee desde «Carpetas ARCA».
-- No presenta nada ni genera pagos en ARCA: solo consulta y descarga.
-- Solo funciona en `https://fes.afip.gob.ar/mcmp/*`.
+- No presenta nada ni emite ni paga nada en ARCA. En «Mis Comprobantes» solo consulta y descarga; en «Presentación de DDJJ y Pagos» carga VEP hasta «VEPs a enviar» y **se detiene ahí** (nunca elige medio de pago, que es lo que hace que ARCA emita el VEP).
+- Solo funciona en `https://fes.afip.gob.ar/mcmp/*` y `https://seti.afip.gob.ar/setiweb/*`.
 
 ## Instalar (una sola vez)
 1. Bajá esta carpeta (`extension-descargador`) a tu computadora y **descomprimila**.
@@ -38,3 +38,14 @@ Si querés cargar al administrador como cliente en SysCAR, creá un cliente con 
 - `manifest.json` (MV3) · `background.js` (cola cliente → tipo → período; estado en `chrome.storage`) · `paginas.js` (funciones que corren dentro de la página) · `lib/fechas.js` (fechas y nombres, puro) · `popup.*` (interfaz).
 - Pruebas: `node pruebas/fechas.test.mjs` y `node pruebas/paginas.test.mjs` (esta usa Playwright con HTML de ejemplo).
 - Verificado contra las páginas reales de ARCA: selección de persona, menú, consulta y resultados de **Emitidos**. **Pendiente de verificar con la página real:** resultados de Recibidos (se asume igual a Emitidos) y la descarga automática con «Preguntar dónde guardar» desactivado.
+
+
+## Solapa VEP (versión 0.2.0)
+1. En SysCAR → **Agenda VEP** programá los VEP (anticipo de Ganancias, autónomos, monotributo) con su importe y tocá **Descargar plan para la extensión** (archivo `.json`).
+2. En ARCA abrí **Presentación de DDJJ y Pagos** y dejá esa pestaña al frente.
+3. Extensión → solapa **VEP** → elegí el plan → destildá lo que no quieras → **Cargar en «VEPs a enviar»**.
+4. Por cada VEP: elige CUIT, organismo ARCA, grupo y tipo de pago; completa establecimiento 0, año, anticipo/cuota o mes, e importe; verifica en la revisión que el total y el CUIT coincidan; lo agrega y comprueba que aparezca la fila. Si algo no coincide, se detiene y lo informa. No adivina datos que no conoce.
+5. Al terminar, una persona toca **Seleccioná medio de pago** en ARCA. Desde ahí ARCA emite el VEP.
+- Al actualizar desde 0.1.x, Chrome pide aceptar el permiso nuevo para `seti.afip.gob.ar`.
+- Pruebas: `node pruebas/vep.test.mjs` y `node pruebas/paginasVep.test.mjs` (esta última con listas desplegables simuladas).
+- **Pendiente de verificar con ARCA real:** el clic en las listas desplegables (componente Vue «multiselect»), el formato del importe con decimales, los textos de «Tipo de pago» de autónomos, y la pantalla «Datos del pago» de autónomos/monotributo (se asume igual a la de Ganancias: la extensión se detiene si hay un campo que no conoce).

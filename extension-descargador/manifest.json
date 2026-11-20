@@ -1,11 +1,11 @@
 {
   "manifest_version": 3,
-  "name": "SysCAR – Descargador de Mis Comprobantes",
-  "version": "0.1.0",
-  "description": "Descarga en Excel los comprobantes emitidos y recibidos de tus clientes desde «Mis Comprobantes» de ARCA, con tu propia sesión. No guarda ni toca tu Clave Fiscal.",
+  "name": "SysCAR – Descargador y VEP de ARCA",
+  "version": "0.2.0",
+  "description": "Descarga en Excel los comprobantes de tus clientes desde «Mis Comprobantes» y carga los VEP recurrentes hasta «VEPs a enviar», con tu propia sesión. No guarda ni toca tu Clave Fiscal ni emite ni paga nada.",
   "minimum_chrome_version": "110",
   "permissions": ["storage", "downloads", "scripting"],
-  "host_permissions": ["https://fes.afip.gob.ar/*"],
+  "host_permissions": ["https://fes.afip.gob.ar/*", "https://seti.afip.gob.ar/*"],
   "background": { "service_worker": "background.js", "type": "module" },
-  "action": { "default_popup": "popup.html", "default_title": "SysCAR – Mis Comprobantes" }
+  "action": { "default_popup": "popup.html", "default_title": "SysCAR – ARCA" }
 }

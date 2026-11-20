@@ -13,3 +13,6 @@ button:disabled{opacity:.5;cursor:default}
 .mensaje{margin:6px 0;font-weight:600}
 table{border-collapse:collapse;width:100%;font-size:12px}td{border-top:1px solid #e3e8ee;padding:3px 4px;vertical-align:top}
 .ok{color:#047857}.error{color:#b91c1c}.vacio{color:#92620a}
+
+.solapas{display:flex;gap:4px;margin:6px 0}.solapas button{flex:1;border-radius:6px 6px 0 0}.solapas button.activa{background:#0f766e;color:#fff;border-color:#0f766e}
+.warn{color:#92620a}

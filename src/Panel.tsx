@@ -16,12 +16,13 @@ import Ayuda from './pantallas/Ayuda'
 import Reportes from './pantallas/Reportes'
 import LibroIva from './pantallas/LibroIva'
 import DdjjVep from './pantallas/DdjjVep'
+import AgendaVep from './pantallas/AgendaVep'
 import Carpetas from './pantallas/Carpetas'
 import Obligaciones from './pantallas/Obligaciones'
 import Recategorizacion from './pantallas/Recategorizacion'
 import Vencimientos from './pantallas/Vencimientos'
 
-type Vista = 'tablero' | 'ayuda' | 'reportes' | 'libro_iva' | 'ddjj_vep' | 'importar' | 'carpetas' | 'tareas' | 'agenda' | 'obligaciones' | 'recategorizacion' | 'vencimientos' | 'certificados' | 'clientes' | 'usuarios' | 'roles' | 'auditoria' | 'estudios'
+type Vista = 'tablero' | 'ayuda' | 'reportes' | 'libro_iva' | 'ddjj_vep' | 'agenda_vep' | 'importar' | 'carpetas' | 'tareas' | 'agenda' | 'obligaciones' | 'recategorizacion' | 'vencimientos' | 'certificados' | 'clientes' | 'usuarios' | 'roles' | 'auditoria' | 'estudios'
 
 export default function Panel({ session }: { session: Session }) {
   const yo = session.user.id
@@ -93,6 +94,7 @@ export default function Panel({ session }: { session: Session }) {
     solapas.push({ id: 'agenda', nombre: 'Agenda' })
     solapas.push({ id: 'obligaciones', nombre: 'Obligaciones' })
     solapas.push({ id: 'ddjj_vep', nombre: 'DDJJ y VEP' })
+    solapas.push({ id: 'agenda_vep', nombre: 'Agenda VEP' })
     solapas.push({ id: 'recategorizacion', nombre: 'Recategorización' })
     solapas.push({ id: 'reportes', nombre: 'Reportes' })
     solapas.push({ id: 'libro_iva', nombre: 'Libro IVA' })
@@ -162,6 +164,7 @@ export default function Panel({ session }: { session: Session }) {
       {actual === 'reportes' && estudio && <Reportes key={estudio.id} estudio={estudio} />}
       {actual === 'libro_iva' && estudio && <LibroIva key={estudio.id} estudio={estudio} />}
       {actual === 'ddjj_vep' && estudio && <DdjjVep key={estudio.id} estudio={estudio} />}
+      {actual === 'agenda_vep' && estudio && <AgendaVep key={estudio.id} estudio={estudio} permisos={permisos} />}
       {actual === 'carpetas' && estudio && <Carpetas key={estudio.id} estudio={estudio} permisos={permisos} yo={yo} />}
       {actual === 'tareas' && estudio && <Tareas key={estudio.id} estudio={estudio} permisos={permisos} />}
       {actual === 'agenda' && estudio && <Agenda key={estudio.id} estudio={estudio} permisos={permisos} yo={yo} />}

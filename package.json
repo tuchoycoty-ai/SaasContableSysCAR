@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "test:importar": "tsx pruebas/importar.test.ts",
     "test:pdf": "tsx pruebas/pdf.test.ts",
+    "test:vep": "tsx pruebas/vepAgenda.test.ts && node extension-descargador/pruebas/vep.test.mjs && node extension-descargador/pruebas/paginasVep.test.mjs",
     "empaquetar:extension": "cd extension-descargador && zip -qr ../public/descargas/syscar-descargador.zip . -x 'pruebas/*'"
   },
   "dependencies": {

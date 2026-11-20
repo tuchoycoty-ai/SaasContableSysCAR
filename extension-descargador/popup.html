@@ -1,7 +1,9 @@
 <!doctype html>
-<html lang="es"><head><meta charset="utf-8"><title>SysCAR – Mis Comprobantes</title><link rel="stylesheet" href="popup.css"></head>
+<html lang="es"><head><meta charset="utf-8"><title>SysCAR – ARCA</title><link rel="stylesheet" href="popup.css"></head>
 <body>
-<h1>SysCAR · Mis Comprobantes</h1>
+<h1>SysCAR · ARCA</h1>
+<div class="solapas"><button id="sCompr" class="activa">Comprobantes</button><button id="sVep">VEP</button></div>
+<div id="panelCompr">
 <p class="chico">Con tu sesión de ARCA ya iniciada, baja en Excel los comprobantes de tus clientes. La extensión no guarda ni usa tu Clave Fiscal.</p>
 
 <section><h2>1. Clientes</h2>
@@ -34,5 +36,25 @@
 <p id="mensaje" class="mensaje"></p>
 <div id="resultados"></div>
 <p class="chico">Los archivos quedan en <b>Descargas/SysCAR/Emitidos</b> y <b>Descargas/SysCAR/Recibidos</b>. Elegí esas carpetas en SysCAR → Carpetas ARCA.</p>
+</div>
+<div id="panelVep" class="oculto">
+<p class="chico">Carga en ARCA los VEP que programaste en SysCAR (Ganancias, autónomos, monotributo) y <b>se detiene en «VEPs a enviar»</b>. No elige medio de pago: no se emite ni se paga nada hasta que lo hacés vos.</p>
+<section><h2>1. Plan de SysCAR</h2>
+  <input type="file" id="archivoPlan" accept=".json,application/json">
+  <p id="infoPlan" class="chico">Todavía no cargaste un plan. En SysCAR → Agenda VEP → «Descargar plan para la extensión».</p>
+  <div id="listaVep" class="lista"></div>
+</section>
+<section><h2>2. Cargar en ARCA</h2>
+  <p class="chico">Abrí «Presentación de DDJJ y Pagos» desde el portal de ARCA y dejá esa pestaña al frente.</p>
+  <div class="fila">
+    <button id="iniciarVep" class="primario">Cargar en «VEPs a enviar»</button>
+    <button id="continuarVep" class="oculto primario">Continuar</button>
+    <button id="detenerVep" class="oculto">Detener</button>
+    <button id="limpiarVep" class="oculto">Limpiar</button>
+  </div>
+  <p id="mensajeVep" class="mensaje"></p>
+  <div id="resultadosVep"></div>
+</section>
+</div>
 <script type="module" src="popup.js"></script>
 </body></html>
