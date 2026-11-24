@@ -96,7 +96,14 @@ async function hacerTarea(job, t) {
   await irA(tabId, `${BASE}${t.tipo === 'Emitidos' ? 'comprobantesEmitidos.do' : 'comprobantesRecibidos.do'}`)
   await pausaCorta()
   const prep = await ejecutar(tabId, prepararBusqueda, [t.desde, t.hasta], 'MAIN')
-  if (!prep || !prep.ok) throw new Error((prep && prep.motivo) || 'No pude cargar las fechas.')
+  if (!prep || !prep.ok) {
+    const e = new Error((prep && prep.motivo) || 'No pude cargar las fechas.')
+    if (prep && prep.sinPantalla) {
+      e.saltarCliente = true
+      e.message += ' Suele pasar cuando a ese cliente no le tenés delegado «Mis Comprobantes» en ARCA (Administrador de Relaciones). Se omiten sus otros períodos de este tipo.'
+    }
+    throw e
+  }
   // 3. Buscar
   const res = await ejecutar(tabId, buscarYEsperar, [90000], 'MAIN')
   if (!res) throw new Error('ARCA no respondió.')
@@ -121,6 +128,7 @@ async function correr() {
   corriendo = true
   latido = setInterval(() => chrome.runtime.getPlatformInfo(() => {}), 20000)
   let seguidos = 0
+  let saltar = false
   try {
     for (;;) {
       let job = await leerJob()
@@ -146,12 +154,19 @@ async function correr() {
           break
         }
         r = { estado: 'error', detalle: e.message }
-        seguidos++
+        if (e.saltarCliente) saltar = true
+        else seguidos++
       }
       job = await leerJob()
       if (!job || job.estado !== 'corriendo') break // el usuario detuvo el trabajo
       job.resultados.push({ ...t, ...r })
       job.i++
+      // Si el problema es del cliente (no de un mes), no se insiste con sus otros períodos del mismo tipo.
+      while (saltar && job.i < job.cola.length && job.cola[job.i].cuit === t.cuit && job.cola[job.i].tipo === t.tipo) {
+        job.resultados.push({ ...job.cola[job.i], estado: 'omitido', detalle: 'Omitido: ARCA no mostró la consulta de este cliente.' })
+        job.i++
+      }
+      saltar = false
       if (seguidos >= ERRORES_SEGUIDOS_MAX) {
         job.estado = 'pausado'
         job.mensaje = `Hubo ${seguidos} errores seguidos; paré para no insistir con ARCA. Revisá el detalle y tocá «Continuar».`

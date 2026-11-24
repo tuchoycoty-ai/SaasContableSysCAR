@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SysCAR – Descargador y VEP de ARCA",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Descarga en Excel los comprobantes de tus clientes desde «Mis Comprobantes» y carga los VEP recurrentes hasta «VEPs a enviar», con tu propia sesión. No guarda ni toca tu Clave Fiscal ni emite ni paga nada.",
   "minimum_chrome_version": "110",
   "permissions": ["storage", "downloads", "scripting"],

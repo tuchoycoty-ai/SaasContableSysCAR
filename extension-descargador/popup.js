@@ -44,8 +44,8 @@ function dibujarJob(job) {
   if (!job) { $('mensaje').textContent = ''; $('resultados').innerHTML = ''; return }
   const prog = `${Math.min(job.i, job.cola.length)} de ${job.cola.length}`
   $('mensaje').textContent = `${job.mensaje || ''} (${prog})`
-  const nombre = { ok: 'Descargado', sin_comprobantes: 'Sin comprobantes', error: 'Error' }
-  const clase = { ok: 'ok', sin_comprobantes: 'vacio', error: 'error' }
+  const nombre = { ok: 'Descargado', sin_comprobantes: 'Sin comprobantes', omitido: 'Omitido', error: 'Error' }
+  const clase = { ok: 'ok', sin_comprobantes: 'vacio', omitido: 'vacio', error: 'error' }
   $('resultados').innerHTML = `<table>${job.resultados.map((r) =>
     `<tr><td>${esc(r.persona)}<br><small>${r.tipo} · ${esc(r.etiqueta)}</small></td><td class="${clase[r.estado] || ''}">${nombre[r.estado] || r.estado}<br><small>${esc(r.detalle || '')}</small></td></tr>`).join('')}</table>`
 }

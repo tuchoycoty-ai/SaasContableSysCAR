@@ -29,7 +29,11 @@ export function leerPersonaActiva() {
 export function prepararBusqueda(desde, hasta) {
   const quiero = `${desde} - ${hasta}`
   const inp = document.getElementById('fechaEmision')
-  if (!inp) return { ok: false, motivo: 'No encuentro el campo de fecha (ARCA puede haber cambiado la página).' }
+  if (!inp) {
+    // Sin formulario: ARCA devolvió otra cosa (a veces una página casi vacía con un código de error).
+    const texto = (document.body ? document.body.innerText : '').replace(/\s+/g, ' ').trim().slice(0, 80)
+    return { ok: false, sinPantalla: true, texto, motivo: texto ? `ARCA no mostró el formulario de consulta; mostró solo: «${texto}».` : 'No encuentro el campo de fecha (ARCA puede haber cambiado la página).' }
+  }
   const jq = window.jQuery
   const dpDe = () => { try { return jq ? jq(inp).data('daterangepicker') : null } catch (e) { return null } }
   try {
